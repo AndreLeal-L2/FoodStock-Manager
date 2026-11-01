@@ -26,7 +26,10 @@ class StockService {
     }
     @Transactional
     Product addProduct(NewProduct p) {
-        String id = UUID.randomUUID().toString();
+        return addProductWithId(UUID.randomUUID().toString(),p);
+    }
+    @Transactional
+    Product addProductWithId(String id,NewProduct p) {
         db.update("INSERT INTO products(id,name,unit,stock,minimum_stock) VALUES(?,?,?,?,?)",id,p.name().strip(),p.unit(),p.initialStock(),p.minimumStock());
         if (p.initialStock().signum() > 0) movement(id,p.initialStock(),"Estoque inicial (sem despesa associada)");
         return products().stream().filter(v -> v.id().equals(id)).findFirst().orElseThrow();
@@ -38,8 +41,11 @@ class StockService {
     }
     @Transactional
     Map<String,String> addPurchase(NewPurchase p) {
+        return addPurchaseWithId(UUID.randomUUID().toString(),p);
+    }
+    @Transactional
+    Map<String,String> addPurchaseWithId(String id,NewPurchase p) {
         lockStock(p.productId());
-        String id=UUID.randomUUID().toString();
         db.update("INSERT INTO purchases(id,product_id,quantity,total,store,purchased_on) VALUES(?,?,?,?,?,?)",
             id,p.productId(),p.quantity(),p.total(),p.store().strip(),p.purchasedOn());
         db.update("UPDATE products SET stock=stock+? WHERE id=?",p.quantity(),p.productId());

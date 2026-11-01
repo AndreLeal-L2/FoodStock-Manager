@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="color-scheme" content="light">
+  <meta name="color-scheme" content="dark">
   <meta name="description" content="Organiza os alimentos de casa, regista as compras e compara gastos e preços por unidade com os dados guardados no teu computador.">
   <title>FoodStock · A tua despensa, em dia</title>
-  <link rel="preload" href="fonts/red-hat-text.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="fonts/host-grotesk.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="stylesheet" href="style.css">
   <script type="module" src="app.js"></script>
 </head>
@@ -17,21 +17,21 @@
     <details class="navigation" open>
       <summary>Menu</summary>
       <nav aria-label="Navegação">
-        <a href="#overview"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg><span>Visão geral</span></a>
-        <a href="#stock"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v16H4zM7 2v6m10-6v6M4 11h16M9 15h6"/></svg><span>A minha despensa</span></a>
-        <a href="#shopping"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h12M9 12h12M9 19h12M3 5l1 1 2-2M3 12l1 1 2-2M3 19l1 1 2-2"/></svg><span>Lista de compras</span></a>
-        <a href="#purchases"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12l2 14H4L6 7zM9 7V5a3 3 0 0 1 6 0v2"/></svg><span>Compras</span></a>
-        <a href="#prices"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3v17h17M8 15l4-5 4 2 4-7"/></svg><span>Preços e lojas</span></a>
-        <a href="#settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18M3 17h18M8 4v6m8 4v6"/></svg><span>Ligação e dados</span></a>
+        <a href="#overview" data-title="Visão geral" title="Visão geral"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg><span>Resumo</span></a>
+        <a href="#stock" data-title="A minha despensa" title="A minha despensa"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v16H4zM7 2v6m10-6v6M4 11h16M9 15h6"/></svg><span>Despensa</span></a>
+        <a href="#shopping" data-title="Lista de compras" title="Lista de compras"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h12M9 12h12M9 19h12M3 5l1 1 2-2M3 12l1 1 2-2M3 19l1 1 2-2"/></svg><span>Lista</span></a>
+        <a href="#purchases" data-title="Compras" title="Compras"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12l2 14H4L6 7zM9 7V5a3 3 0 0 1 6 0v2"/></svg><span>Compras</span></a>
+        <a href="#prices" data-title="Preços e lojas" title="Preços e lojas"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3v17h17M8 15l4-5 4 2 4-7"/></svg><span>Preços</span></a>
+        <a href="#settings" data-title="Ligação e dados" title="Ligação e dados"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18M3 17h18M8 4v6m8 4v6"/></svg><span>Dados</span></a>
       </nav>
     </details>
-    <div class="local-note"><p>Os teus dados ficam contigo.</p><p>A informação é guardada na API do teu computador.</p></div>
+    <div class="local-note"><p>Guardado neste navegador.</p><p>As alterações são enviadas quando a tua API estiver disponível.</p></div>
   </aside>
   <main>
-    <header><h1 id="page-title">Visão geral</h1><button id="refresh" class="secondary" type="button">Atualizar dados</button></header>
-    <div class="status-line"><p id="connection" role="status">A ligar à API local…</p></div>
+    <header><h1 id="page-title">Visão geral</h1><button id="refresh" class="secondary" type="button">Sincronizar</button></header>
+    <div class="status-line"><p id="connection" role="status">A abrir os dados deste navegador…</p><a class="sync-link" href="#settings">Ver sincronização</a></div>
     <p id="message" role="alert" hidden></p>
-    <noscript><p class="empty">Ativa o JavaScript para consultar os dados e usar os formulários. A API precisa de estar a correr no teu computador.</p></noscript>
+    <noscript><p class="empty">Ativa o JavaScript para consultar os dados e usar os formulários. Os dados são guardados neste navegador.</p></noscript>
     <section id="overview" class="view">
       <div class="section-heading overview-heading"><h2>O teu ano em números</h2><label>Ano <input id="year" type="number" min="2000" max="2100" aria-label="Ano das estatísticas"></label></div>
       <div id="metrics" class="metrics"></div>
@@ -57,8 +57,8 @@
       </div>
     </section>
     <section id="shopping" class="view" hidden>
-      <div class="section-heading"><div><h2>O que levar do supermercado</h2><p class="muted shopping-description">A tua lista, organizada por categoria. Quantidades e alternativas por decidir ficam em aberto.</p></div><button id="import-shopping" type="button">Carregar a tua lista</button></div>
-      <p class="hint">Marcar um item como “no carrinho” não altera o estoque nem os gastos. Depois de pagar, regista a quantidade real e o valor em Compras.</p>
+      <div class="section-heading"><h2>O que levar do supermercado</h2><button id="import-shopping" type="button">Carregar a tua lista</button></div>
+      <details class="shopping-help"><summary>Como usar a lista</summary><p class="muted shopping-description">A tua lista, organizada por categoria. Quantidades e alternativas por decidir ficam em aberto.</p><p class="hint">Marcar um item como “no carrinho” não altera o estoque nem os gastos. Depois de pagar, regista a quantidade real e o valor em Compras.</p></details>
       <p id="shopping-status" role="status"></p>
       <div id="shopping-items"></div>
     </section>
@@ -70,7 +70,8 @@
     </section>
     <section id="prices" class="view" hidden><article class="prices-panel"><h2>Quanto custa, de verdade?</h2><p class="muted">Preço por unidade: a última compra comparada com a anterior. Melhores preços de todo o histórico, independentemente do ano selecionado.</p><p class="hint">Uma descida é uma oportunidade observada, não uma previsão de preços atuais. Compara o mesmo produto e a mesma qualidade.</p><div id="price-list"></div></article></section>
     <section id="settings" class="view" hidden>
-      <div class="settings-grid"><article class="settings-connection"><h2>Ligação à API local</h2><p>A API precisa de estar a correr neste computador. O GitHub Pages serve apenas a interface.</p><form id="settings-form"><label>Endereço da API<input id="api-url" type="url" required placeholder="http://localhost:8080"></label><button>Guardar e ligar</button></form><p class="hint">Usa localhost ou 127.0.0.1. O navegador pode pedir autorização para aceder à rede local. Se bloquear a ligação, abre a interface localmente seguindo o README.</p></article><article class="settings-data"><h2>Os teus dados</h2><p>Moeda: EUR (€). Exporta uma cópia legível do histórico. Para restaurar a base, faz também uma cópia da pasta backend/data com a API parada.</p><button id="export" class="secondary" type="button">Exportar dados JSON</button><p class="hint">Esta versão ainda não importa o ficheiro JSON nem permite editar ou apagar compras.</p></article></div>
+      <div class="settings-grid"><article class="settings-connection"><h2>Ligação à API local</h2><p>Podes registar dados com a API desligada. A aplicação tenta enviar as alterações ao abrir, ao voltar a este separador e a cada 15 segundos enquanto está visível.</p><form id="settings-form"><label>Endereço da API<input id="api-url" type="url" required placeholder="http://localhost:8080"></label><button>Guardar e ligar</button></form><p class="hint">No Mac, podes usar http://localhost:8080. No telemóvel, usa um endereço HTTPS que chegue à API do Mac. O navegador pode pedir autorização de acesso local; consulta o README se bloquear a ligação.</p></article><article class="settings-data"><h2>Os teus dados</h2><p>Moeda: EUR (€). A cópia deste navegador inclui alimentos, compras, lista e alterações ainda por enviar. Exporta um backup antes de limpar os dados do site ou mudar de dispositivo.</p><button id="export" class="secondary" type="button">Exportar dados JSON</button><p class="hint">A exportação funciona sem API. Esta versão ainda não importa o ficheiro JSON nem permite editar ou apagar compras.</p></article></div>
+      <article class="sync-panel"><h2>Sincronização</h2><p id="sync-summary" role="status"></p><p id="sync-last" class="muted"></p><p id="sync-error" class="sync-error"></p><button id="sync-retry" type="button" class="secondary">Tentar novamente</button><details class="pending-details"><summary>Alterações pendentes</summary><ul id="sync-pending"></ul></details><p id="offline-cache-note" class="hint">Depois do primeiro acesso, este navegador prepara a interface para abrir sem Internet. As tentativas de sincronização funcionam enquanto a página está aberta; voltam ao regressar.</p></article>
     </section>
     <footer><span>FoodStock</span><span>Uma despensa mais consciente, uma compra de cada vez.</span></footer>
   </main>

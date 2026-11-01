@@ -14,7 +14,7 @@ import static org.springframework.http.HttpStatus.NOT_FOUND;
 @Service
 class ShoppingService {
     record Item(String id, String category, String categoryNote, String name,
-                String quantityText, String notes, boolean checked) {}
+                String quantityText, String notes, boolean checked, int templateIndex) {}
     record ShoppingList(boolean templateImported, List<Item> items) {}
     record Check(@NotNull Boolean checked) {}
     record Details(@NotNull @Size(max=120) String quantityText, @NotNull @Size(max=250) String notes) {}
@@ -35,7 +35,7 @@ class ShoppingService {
         boolean imported=Boolean.TRUE.equals(db.queryForObject("SELECT template_imported FROM shopping_list_state WHERE id=1",Boolean.class));
         var items=db.query("SELECT * FROM shopping_items ORDER BY sort_order",(r,n)->new Item(
             r.getString("id"),r.getString("category"),r.getString("category_note"),r.getString("name"),
-            r.getString("quantity_text"),r.getString("notes"),r.getBoolean("checked")));
+            r.getString("quantity_text"),r.getString("notes"),r.getBoolean("checked"),r.getInt("sort_order")));
         return new ShoppingList(imported,items);
     }
     @Transactional
@@ -45,7 +45,7 @@ class ShoppingService {
             int order=0;
             for(var group:template.groups()) for(var item:group.items()) {
                 db.update("INSERT INTO shopping_items(id,category,category_note,name,quantity_text,notes,checked,sort_order) VALUES(?,?,?,?,?,?,FALSE,?)",
-                    UUID.randomUUID().toString(),group.category(),group.note(),item.name(),item.quantityText(),item.notes(),order++);
+                    UUID.nameUUIDFromBytes(("foodstock-shopping-v1:"+order).getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString(),group.category(),group.note(),item.name(),item.quantityText(),item.notes(),order++);
             }
             db.update("UPDATE shopping_list_state SET template_imported=TRUE WHERE id=1");
         }

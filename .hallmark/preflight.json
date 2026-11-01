@@ -10,35 +10,35 @@
   "routes": [
     "#overview",
     "#stock",
+    "#shopping",
     "#purchases",
     "#prices",
     "#settings"
   ],
   "findings": {
-    "fonts": "DM Sans + Manrope (original docs/style.css:1-2), remote import did not load in cloud browser",
-    "palette": "Green and light neutral paper (original docs/style.css:2); no locked design.md or named brand specification",
-    "motion": "None beyond native controls",
-    "spacing": "Ad hoc lengths in original docs/style.css:2",
-    "framework": "Vanilla HTML/CSS/JavaScript (docs/index.html:1, docs/app.js:1)",
-    "audience": "Personal household food inventory; macOS local Java API",
-    "material": "Existing live FoodStock UI and real database; no photos or invented figures",
-    "tone": "User confirmed editorial and welcoming, like a grocery notebook"
+    "fonts": "Red Hat Display and Red Hat Text, local assets, original docs/style.css font-face definitions",
+    "palette": "Furrow warm paper and tangerine in existing design.md/docs/tokens.css, explicitly rejected by user this turn",
+    "motion": "Native controls and a one-pixel press",
+    "framework": "Vanilla HTML/CSS/ES modules, Java 21 Spring Boot with H2",
+    "material": "Existing six-view product, actual local data and user-provided 39-item grocery template",
+    "audience": "User on macOS and phone",
+    "direction": "User selected dark blue and grey, mobile priority and offline/browser storage with automatic API synchronization"
   },
   "preserve": [
-    "all five routes",
-    "all form field names, bounds and required attributes",
-    "API requests and data calculations",
-    "local-only database",
-    "sidebar shell on desktop",
-    "all legal and data limitations copy"
+    "all six destinations and existing fields",
+    "user grocery list and quantities",
+    "backend data without reset",
+    "purchases, consumption and financial comparisons",
+    "local font assets with licences"
   ],
   "introduce": [
-    "Furrow app tokens",
-    "locally hosted Red Hat fonts",
-    "ruled annual ledger instead of marketing banner",
-    "inventory before entry forms",
-    "native compact menu",
-    "mobile labeled table records"
+    "Console material, blue signal by explicit request",
+    "Host Grotesk and measured Atkinson Mono",
+    "mobile bottom navigation",
+    "durable IndexedDB outbox and safe API receipts",
+    "service-worker shell cache",
+    "offline local export and statistics",
+    "visible pending/conflict resolution"
   ],
-  "baseline": "The checkout was already uncommitted from this session. No commit/stash/reset was performed. The original three UI files were copied to /workspace/.foodstock-runtime/before-hallmark before editing; Hallmark kept-checks record the original wiring."
+  "baseline": "Started this redesign from a clean committed work branch. Copied original UI and design.md to /workspace/.foodstock-runtime/offline-before and captured the live original with Hallmark --before. No route or source file was deleted."
 }

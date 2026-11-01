@@ -1,43 +1,42 @@
-# FoodStock: revisão Hallmark
+# FoodStock: revisão mobile e offline
 
-Redesign completo das cinco vistas da aplicação, com o tema Furrow. O utilizador escolheu um tom editorial e acolhedor, como um caderno de compras. Skill oficial: [Nutlope/hallmark](https://github.com/Nutlope/hallmark/blob/4f6a46c6dc325d40ab268c93e25c7b96676ebccd/skills/hallmark/SKILL.md), versão 2.0.0.
+A pedido do utilizador: redesenho Hallmark, fundo escuro com azul/cinzento, prioridade ao telemóvel e dados guardados no navegador, com envio posterior para a API. Skill oficial: [Nutlope/hallmark 2.0.0](https://github.com/Nutlope/hallmark/blob/4f6a46c6dc325d40ab268c93e25c7b96676ebccd/skills/hallmark/SKILL.md).
 
-## Resultado
+## Design
 
-- Validação estática e no Chromium pela ferramenta oficial `sloplint.mjs`, scope `app`, nas cinco vistas: **0 FAIL, 0 REFLEX**.
-- 25 capturas oficiais: desktop 1280, 1440 e 1920, página completa a 1440 e telemóvel a 375 para cada vista. As medições incluem larguras de 320, 375, 414, 768, 1024, 1280 e 1920px.
-- Preservação: 5/5 destinos, 13/13 campos e 2/2 hooks de script. O título promocional eliminado está declarado no stamp do CSS.
-- Um aviso esperado do kept-check: a hora `13:31` do estado da API no registo original é dinâmica e mudou na nova captura. Não é uma estatística de compras removida.
-- Os 7 testes Java existentes passaram, sem falhas, erros ou testes ignorados. Build Maven e sintaxe JavaScript passaram.
-- O fluxo no Chromium passou: criar produto, escapar texto HTML, comprar duas quantidades, comparar preço por kg, consumir e exportar JSON. Foi usada uma API separada, em memória, na porta 8081; a base real da porta 8080 não recebeu dados de teste.
+Tema **Console**, sorteado 2/3, com azul a substituir âmbar por escolha explícita do utilizador. O sistema Furrow anterior foi substituído em `design.md` por esta instrução. Fontes locais Host Grotesk e Atkinson Hyperlegible Mono, respetivamente para leitura e medições; licenças OFL em `docs/fonts/`. Sem fotografias, imagens de substituição ou números inventados. Capturas preenchidas usam apenas uma base de teste isolada.
 
-## Revisão visual independente
+- Hallmark estático e render: **0 FAIL, 0 REFLEX** nas seis vistas.
+- 30 capturas oficiais: 1280, 1440 e 1920px, página completa a 1440 e a 375px por vista. O checker também mede outras larguras, de 320 a 1920px.
+- Preservação: **6/6 destinos, 54/54 campos, 3/3 hooks, 23/23 títulos**.
+- Aviso esperado: o relógio da API na captura original mudou. Não representa remoção de dados de compras.
+- [Comparação antes/depois](compare.html), gerada pela ferramenta. Capturas e baseline são ignorados pelo Git.
 
-O revisor pediu três correções, todas aplicadas:
+Revisão independente pediu dois ajustes: reduzir a altura inicial da lista e incluir a tipografia de medições do Console. Aplicados: ajuda em disclosure, Editar ao lado do item com alvo de 44px e Atkinson Mono em valores, quantidades e datas. Um editor recolhido que podia exceder a largura móvel foi corrigido na confirmação mecânica. A verificação final foi feita pelo agente principal após as alterações; não foi alegada uma segunda aprovação independente.
 
-1. Preservar a tabela mensal compacta no telemóvel, evitando 36 linhas de rótulos.
-2. Corrigir a orientação do estado vazio da despensa: o formulário agora está abaixo.
-3. Limpar o feedback de sucesso ao mudar de vista, evitando mensagens de consumo noutros ecrãs.
+As legendas curtas da navegação inferior mantêm destinos e títulos de página completos. Cada ligação tem também um `title` descritivo. As confirmações distinguem guardar no navegador de sincronizar com a API.
 
-A confirmação das correções foi feita pelo agente principal, com nova renderização oficial e verificação no navegador. Não foi alegada uma segunda aprovação independente.
+## Dados e sincronização
 
-## Alterações de texto e apresentação
+- IndexedDB grava base confirmada e fila numa transação antes de confirmar cada alteração; escrita solicita durabilidade estrita.
+- Identificador estável por operação, recibo persistente na API, transação por aplicação e snapshot consistente.
+- A fila só é removida depois de um snapshot reconhecer o recibo. Resposta perdida não duplica a compra.
+- Notas em conflito e consumo impossível não são apagados; a alteração fica pendente para resolução explícita.
+- Identidade da base impede que outra API substitua silenciosamente a cópia local.
+- Web Locks coordena separadores quando disponível; recibos continuam a proteger contra duplicados quando houver entregas simultâneas.
+- Rascunhos e foco dos campos são mantidos durante atualizações da lista, incluindo a passagem de identificadores offline para os identificadores da API.
+- Service worker guarda a interface/fontes, sem guardar respostas da API. Dados, cálculos e exportação JSON funcionam com API desligada.
 
-- `MENOS DESPERDÍCIO. MAIS CONTROLO.` passou a sentence case, sem letras espaçadas (gate 67).
-- `Preços e oportunidades` passou a `Preços e lojas`, para caber na navegação mantida (49a).
-- `Conhece a tua despensa. Entende as tuas compras.` foi integrado no título existente `O teu ano em números` (54 e 69).
-- As linhas decorativas `A TUA CASA, MAIS ORGANIZADA`, `UM POUCO DE PLANEAMENTO VAI LONGE` e `Do supermercado até à última porção, tudo no seu lugar.` foram retiradas (54 e 69).
-- `Atualizar dados ↻` passou a `Atualizar dados`. Os símbolos de navegação foram substituídos por um único conjunto de ícones SVG acessíveis.
-- O estado da API mantém endereço e hora, em frase simples, sem pontos decorativos nem separadores repetidos. Loja e data aparecem em linhas separadas nas tabelas de preços.
-- O estado vazio `Adiciona o primeiro produto acima` passou a `Adiciona o primeiro produto abaixo`, acompanhando a nova ordem da vista.
-- Texto sobre armazenamento, exportação, acesso local e limitações da aplicação preservado.
+## Validação
 
-## Ficheiros e material
+- **18 testes Java** passaram, sem falhas, erros ou ignorados: funcionalidades anteriores e protocolo de sincronização, recibos, repetição concorrente, conflitos, validação, identidade da base e compatibilidade da lista antiga.
+- **6 testes de domínio local** executados diretamente por `npm test`: projeção offline, preços normalizados, comparação mensal/anual, valores decimais, conflitos e correspondência entre templates Java/browser.
+- Suite de navegador reproduzível: `npm run test:browser` (requer JDK, JAR compilado e Chromium). Usa servidor estático, perfil Chrome e base H2 temporários.
+- Verificados: criação de alimentos/compras/consumo com API desligada, edição da lista, exportação offline, reload sem Internet, navegador fechado/reaberto, API ligada posteriormente e envio pelo temporizador sem clique, resposta perdida depois de gravar, consumo em conflito, dois separadores, falha de quota sem falsa confirmação, reinício da API e sete larguras de 320 a 1920px.
+- Dados reais da API principal não foram usados como fixtures nem reinicializados.
 
-- Interface: `docs/index.html`, `docs/style.css`, `docs/app.js`.
-- Sistema partilhado: `docs/tokens.css`, `docs/base.css`, `design.md`.
-- Fontes locais e respetivas licenças OFL: `docs/fonts/`.
-- [Comparação antes/depois](compare.html), gerada pela Hallmark. Capturas e registos originais são ignorados pelo Git.
-- Não foram usadas fotografias, imagens de substituição ou números inventados. As capturas preenchidas usam dados de teste isolados. A interface real começa com a base existente.
-- Nenhum ficheiro do backend ou teste do repositório foi alterado neste redesign.
-- O site ainda não foi publicado. A ligação GitHub Pages/API no macOS continua a exigir validação após publicação, conforme o README.
+## Limites práticos
+
+O primeiro acesso precisa dos ficheiros da interface. Uma página fechada/suspensa não pode garantir pedidos contínuos: a fila persiste e a tentativa retoma ao abrir/voltar. Apagar dados do site apaga a cópia desse navegador; o backup JSON inclui pendências, mas ainda não tem importador automático.
+
+Para sincronizar no telemóvel com a API no Mac, é preciso um endereço HTTPS alcançável pelo telefone. O README descreve Tailscale Serve privado. Essa configuração e as permissões reais de Safari/iOS dependem dos dispositivos do utilizador; aqui foi validado o fluxo no Chromium com API local. A API instalada no Mac precisa de ser atualizada para o novo protocolo.
