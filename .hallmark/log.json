@@ -1,0 +1,44 @@
+[
+  {
+    "mode": "redesign",
+    "depth": "full",
+    "scope": "app",
+    "theme": "furrow",
+    "shape": "app screen",
+    "axes": "light/grotesk-sans/warm",
+    "nav": "kept sidebar with native mobile disclosure",
+    "footer": "kept colophon",
+    "imagery": "none, working application",
+    "signature": "ruled annual grocery ledger",
+    "entry": "FoodStock five-view redesign",
+    "fingerprint": "app/sidebar/ledger/ruled/neutral/inline-forms",
+    "sections": [
+      "annual ledger",
+      "inventory before forms",
+      "purchase entry and history",
+      "unit price table",
+      "local connection and data"
+    ],
+    "waived": [],
+    "prompt": "Household food inventory and grocery spending app, editorial welcoming notebook tone",
+    "date": "2026-11-01",
+    "sweep": {
+      "floorFailures": 0,
+      "reflex": 0,
+      "warnings": 1,
+      "warningReason": "Live API refresh timestamp changed since baseline",
+      "finishReview": "independent subagent; 3 findings corrected and recaptured",
+      "javaTestsPassed": 7,
+      "browserWorkflow": "passed; isolated memory database",
+      "viewportChecks": [
+        320,
+        375,
+        390,
+        768,
+        1024,
+        1440,
+        1920
+      ]
+    }
+  }
+]

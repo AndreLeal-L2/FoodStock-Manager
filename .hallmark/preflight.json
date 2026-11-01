@@ -1,0 +1,44 @@
+{
+  "scanned": "2026-11-01",
+  "source": {
+    "repository": "https://github.com/Nutlope/hallmark",
+    "commit": "4f6a46c6dc325d40ab268c93e25c7b96676ebccd",
+    "skill": "skills/hallmark/SKILL.md",
+    "version": "2.0.0"
+  },
+  "scope": "app",
+  "routes": [
+    "#overview",
+    "#stock",
+    "#purchases",
+    "#prices",
+    "#settings"
+  ],
+  "findings": {
+    "fonts": "DM Sans + Manrope (original docs/style.css:1-2), remote import did not load in cloud browser",
+    "palette": "Green and light neutral paper (original docs/style.css:2); no locked design.md or named brand specification",
+    "motion": "None beyond native controls",
+    "spacing": "Ad hoc lengths in original docs/style.css:2",
+    "framework": "Vanilla HTML/CSS/JavaScript (docs/index.html:1, docs/app.js:1)",
+    "audience": "Personal household food inventory; macOS local Java API",
+    "material": "Existing live FoodStock UI and real database; no photos or invented figures",
+    "tone": "User confirmed editorial and welcoming, like a grocery notebook"
+  },
+  "preserve": [
+    "all five routes",
+    "all form field names, bounds and required attributes",
+    "API requests and data calculations",
+    "local-only database",
+    "sidebar shell on desktop",
+    "all legal and data limitations copy"
+  ],
+  "introduce": [
+    "Furrow app tokens",
+    "locally hosted Red Hat fonts",
+    "ruled annual ledger instead of marketing banner",
+    "inventory before entry forms",
+    "native compact menu",
+    "mobile labeled table records"
+  ],
+  "baseline": "The checkout was already uncommitted from this session. No commit/stash/reset was performed. The original three UI files were copied to /workspace/.foodstock-runtime/before-hallmark before editing; Hallmark kept-checks record the original wiring."
+}

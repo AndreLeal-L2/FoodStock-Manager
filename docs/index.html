@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="Organiza os alimentos de casa, regista as compras e compara gastos e preços por unidade com os dados guardados no teu computador.">
+  <title>FoodStock · A tua despensa, em dia</title>
+  <link rel="preload" href="fonts/red-hat-text.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="#overview" aria-label="FoodStock, início"><span class="logo" aria-hidden="true">f.</span>FoodStock</a>
+    <p class="tagline">Menos desperdício.<br>Mais controlo.</p>
+    <details class="navigation" open>
+      <summary>Menu</summary>
+      <nav aria-label="Navegação">
+        <a href="#overview"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg><span>Visão geral</span></a>
+        <a href="#stock"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v16H4zM7 2v6m10-6v6M4 11h16M9 15h6"/></svg><span>A minha despensa</span></a>
+        <a href="#purchases"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12l2 14H4L6 7zM9 7V5a3 3 0 0 1 6 0v2"/></svg><span>Compras</span></a>
+        <a href="#prices"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3v17h17M8 15l4-5 4 2 4-7"/></svg><span>Preços e lojas</span></a>
+        <a href="#settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18M3 17h18M8 4v6m8 4v6"/></svg><span>Ligação e dados</span></a>
+      </nav>
+    </details>
+    <div class="local-note"><p>Os teus dados ficam contigo.</p><p>A informação é guardada na API do teu computador.</p></div>
+  </aside>
+  <main>
+    <header><h1 id="page-title">Visão geral</h1><button id="refresh" class="secondary" type="button">Atualizar dados</button></header>
+    <div class="status-line"><p id="connection" role="status">A ligar à API local…</p></div>
+    <p id="message" role="alert" hidden></p>
+    <noscript><p class="empty">Ativa o JavaScript para consultar os dados e usar os formulários. A API precisa de estar a correr no teu computador.</p></noscript>
+    <section id="overview" class="view">
+      <div class="section-heading overview-heading"><h2>O teu ano em números</h2><label>Ano <input id="year" type="number" min="2000" max="2100" aria-label="Ano das estatísticas"></label></div>
+      <div id="metrics" class="metrics"></div>
+      <div class="overview-grid">
+        <article class="ledger"><div class="section-heading"><h2>Gastos mês a mês</h2><p class="muted">Compras registadas em euros</p></div><div id="chart" class="chart" role="img" aria-label="Gastos mensais em euros. Os valores exatos estão na tabela seguinte."></div><div id="monthly-table"></div></article>
+        <div class="overview-aside"><article class="replenishment"><h2>Na próxima lista</h2><p class="muted">Itens no mínimo de estoque ou abaixo</p><div id="low-stock"></div></article><article class="store-ledger"><h2>Gastos por loja</h2><div id="stores"></div></article></div>
+      </div>
+    </section>
+    <section id="stock" class="view" hidden>
+      <article class="inventory-panel"><div class="section-heading"><h2>Na despensa</h2><label class="search">Procurar<input id="search" type="search" placeholder="Nome do alimento"></label></div><div id="inventory"></div></article>
+      <div class="two-columns forms-grid">
+        <article class="form-panel"><h2>Adicionar alimento</h2><p class="muted">Usa sempre a mesma unidade para este produto.</p>
+          <form id="product-form">
+            <label>Nome<input name="name" required maxlength="120" placeholder="Ex.: Arroz basmati"></label>
+            <label>Unidade<select name="unit"><option value="kg">Quilogramas (kg)</option><option value="L">Litros (L)</option><option value="un">Unidades (un)</option></select></label>
+            <div class="form-row"><label>Estoque inicial<input name="initialStock" type="number" min="0" step="0.001" max="999999999" value="0" required></label><label>Mínimo desejado<input name="minimumStock" type="number" min="0" step="0.001" max="999999999" value="0" required></label></div>
+            <p class="hint">O estoque inicial não conta como despesa. Para incluir uma compra nas estatísticas, começa em zero e regista-a em Compras.</p><button>Adicionar à despensa</button>
+          </form>
+        </article>
+        <article class="form-panel consumption-panel"><h2>Registar consumo ou desperdício</h2>
+          <form id="consume-form"><label>Alimento<select name="productId" class="product-options" required></select></label><label>Quantidade na unidade do produto<input name="quantity" type="number" min="0.001" max="999999999" step="0.001" required></label><label>Motivo<select name="reason"><option>Consumo</option><option>Desperdício</option><option>Doação</option></select></label><button class="secondary">Retirar do estoque</button></form>
+        </article>
+      </div>
+    </section>
+    <section id="purchases" class="view" hidden>
+      <article class="form-panel purchase-entry"><div class="form-intro"><h2>Registar uma compra</h2><p class="muted">Cada linha do talão é uma compra. O estoque é atualizado automaticamente.</p></div>
+        <form id="purchase-form"><label>Alimento<select name="productId" class="product-options" required></select></label><div class="form-row"><label>Quantidade na unidade do produto<input name="quantity" type="number" min="0.001" step="0.001" max="999999999" required placeholder="Ex.: 0,5 kg"></label><label>Valor total pago (€)<input name="total" type="number" min="0.01" step="0.01" max="999999999" required></label></div><div class="form-row"><label>Loja<input name="store" required maxlength="120" list="store-options" placeholder="Ex.: Continente"></label><label>Data<input name="purchasedOn" type="date" required></label></div><datalist id="store-options"></datalist><p class="hint">Se compraste 2 embalagens de 500 g, regista 1 kg e o valor total das duas embalagens.</p><button>Guardar compra</button></form>
+      </article>
+      <article class="history-panel"><div class="section-heading"><h2>Histórico de compras</h2><p class="muted">Todas as compras, da mais recente para a mais antiga.</p></div><div id="history"></div></article>
+    </section>
+    <section id="prices" class="view" hidden><article class="prices-panel"><h2>Quanto custa, de verdade?</h2><p class="muted">Preço por unidade: a última compra comparada com a anterior. Melhores preços de todo o histórico, independentemente do ano selecionado.</p><p class="hint">Uma descida é uma oportunidade observada, não uma previsão de preços atuais. Compara o mesmo produto e a mesma qualidade.</p><div id="price-list"></div></article></section>
+    <section id="settings" class="view" hidden>
+      <div class="settings-grid"><article class="settings-connection"><h2>Ligação à API local</h2><p>A API precisa de estar a correr neste computador. O GitHub Pages serve apenas a interface.</p><form id="settings-form"><label>Endereço da API<input id="api-url" type="url" required placeholder="http://localhost:8080"></label><button>Guardar e ligar</button></form><p class="hint">Usa localhost ou 127.0.0.1. O navegador pode pedir autorização para aceder à rede local. Se bloquear a ligação, abre a interface localmente seguindo o README.</p></article><article class="settings-data"><h2>Os teus dados</h2><p>Moeda: EUR (€). Exporta uma cópia legível do histórico. Para restaurar a base, faz também uma cópia da pasta backend/data com a API parada.</p><button id="export" class="secondary" type="button">Exportar dados JSON</button><p class="hint">Esta versão ainda não importa o ficheiro JSON nem permite editar ou apagar compras.</p></article></div>
+    </section>
+    <footer><span>FoodStock</span><span>Uma despensa mais consciente, uma compra de cada vez.</span></footer>
+  </main>
+</body>
+</html>

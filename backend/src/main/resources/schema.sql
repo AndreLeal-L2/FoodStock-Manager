@@ -1,0 +1,24 @@
+CREATE TABLE IF NOT EXISTS products (
+ id VARCHAR(36) PRIMARY KEY,
+ name VARCHAR(120) NOT NULL,
+ unit VARCHAR(8) NOT NULL CHECK (unit IN ('kg','L','un')),
+ stock DECIMAL(16,3) NOT NULL DEFAULT 0 CHECK (stock >= 0),
+ minimum_stock DECIMAL(16,3) NOT NULL DEFAULT 0 CHECK (minimum_stock >= 0)
+);
+CREATE TABLE IF NOT EXISTS purchases (
+ id VARCHAR(36) PRIMARY KEY,
+ product_id VARCHAR(36) NOT NULL REFERENCES products(id),
+ quantity DECIMAL(16,3) NOT NULL CHECK (quantity > 0),
+ total DECIMAL(16,2) NOT NULL CHECK (total > 0),
+ store VARCHAR(120) NOT NULL,
+ purchased_on DATE NOT NULL,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS purchases_date ON purchases(purchased_on);
+CREATE TABLE IF NOT EXISTS movements (
+ id VARCHAR(36) PRIMARY KEY,
+ product_id VARCHAR(36) NOT NULL REFERENCES products(id),
+ quantity DECIMAL(16,3) NOT NULL,
+ reason VARCHAR(200) NOT NULL,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
