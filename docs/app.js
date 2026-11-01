@@ -1,5 +1,6 @@
 import { LocalStore } from './store.mjs';
 import { statistics, quantity } from './model.mjs';
+import { Checkout } from './checkout.mjs';
 const $ = s => document.querySelector(s);
 const currency = new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' });
 const number = new Intl.NumberFormat('pt-PT', { maximumFractionDigits: 3 });
@@ -13,6 +14,7 @@ let localStore;
 let localView;
 let renderSequence=0;
 let lastRendered='';
+const checkout=new Checkout(()=>localStore,notify,()=>reloadLocal());
 function notify(text, success = false) { $('#message').hidden=false;$('#message').textContent=text;$('#message').className=success?'success':''; }
 function table(headers, rows, empty) { return rows.length ? `<div class="table-wrap"><table><thead><tr>${headers.map(h=>`<th scope="col">${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map((c,i)=>`<td data-label="${esc(headers[i])}" class="${['Data','Mês','Gasto','Variação mensal','Disponível','Mínimo','Quantidade','Total','Preço / unidade','Último preço','Variação','Melhor compra registada'].includes(headers[i])&&/\d/.test(String(c))?'measured':''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` : `<p class="empty">${empty}</p>`; }
 function percent(value) { return value==null?'Sem base de comparação':`${value>0?'+':''}${number.format(value)}%`; }
@@ -21,6 +23,7 @@ async function reloadLocal(force=false) {
  try {
   const view=await localStore.view();if(seq!==renderSequence)return;
   localView=view;
+  checkout.update(view);
   const serial=JSON.stringify(view.data)+$('#year').value;
   if(force||serial!==lastRendered) {
    lastRendered=serial;
@@ -38,7 +41,7 @@ async function reloadLocal(force=false) {
  } catch(error) { notify('Não foi possível ler ou guardar dados neste navegador. '+error.message); }
 }
 function operationLabel(op) {
- return ({PRODUCT_CREATE:'Alimento: '+(op.data.name||''),PURCHASE_CREATE:'Compra: '+(op.data.store||''),CONSUME:'Saída de estoque',SHOPPING_IMPORT:'Carregar lista de compras',SHOPPING_CHECK:'Marcação da lista',SHOPPING_DETAILS:'Quantidade e notas da lista'})[op.kind]||'Alteração pendente';
+ return ({PRODUCT_CREATE:'Alimento: '+(op.data.name||''),PURCHASE_CREATE:'Compra: '+(op.data.store||''),CONSUME:'Saída de estoque',CHECKOUT:'Finalizar compras: '+(op.data.items?.length||0)+' item(ns)',SHOPPING_IMPORT:'Carregar lista de compras',SHOPPING_CHECK:'Marcação da lista',SHOPPING_DETAILS:'Quantidade e notas da lista'})[op.kind]||'Alteração pendente';
 }
 async function refresh() { await localStore.sync();await reloadLocal(); }
 async function save(kind,entityId,data) { await localStore.enqueue(kind,entityId,data);await reloadLocal(); }

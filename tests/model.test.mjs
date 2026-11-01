@@ -39,3 +39,38 @@ test('invalid local values are rejected before being queued',()=>{
  assert.throws(()=>project(emptyData(),[product(),purchase('2024-01-01',1,1.001)],true));
  assert.throws(()=>project(emptyData(),[product(),purchase('2999-01-01',1,1)],true));
 });
+
+test('checkout creates a new food, reuses an existing food and updates stock, expenses and list atomically',()=>{
+ const before=project(emptyData(),[product(),op('SHOPPING_IMPORT',{},null),op('SHOPPING_CHECK',{checked:true,templateIndex:0}),op('SHOPPING_CHECK',{checked:true,templateIndex:7})],true).data;
+ const checkout=op('CHECKOUT',{store:'Loja A',purchasedOn:'2024-01-01',items:[
+  {shoppingId:'template-0',templateIndex:0,productId:crypto.randomUUID(),newProduct:{name:'Frango',unit:'kg'},purchaseId:crypto.randomUUID(),quantity:1.2,total:6},
+  {shoppingId:'template-7',templateIndex:7,productId,newProduct:null,purchaseId:crypto.randomUUID(),quantity:1,total:2}
+ ]});
+ const {data}=project(before,[checkout],true);
+ assert.equal(data.products.length,2);assert.equal(data.products.find(p=>p.id===productId).stock,1);assert.equal(data.products.find(p=>p.name==='Frango').stock,1.2);
+ assert.equal(data.purchases.length,2);assert.equal(statistics(data,2024).total,8);assert.equal(data.shoppingList.items.filter(i=>i.checked).length,0);
+ assert.equal(before.purchases.length,0);assert.equal(before.shoppingList.items[0].checked,true);
+ assert.throws(()=>project(data,[checkout],true),/finalizado|desmarcado/);
+});
+test('a checkout failure in the second item cannot leave a partial local purchase',()=>{
+ const before=project(emptyData(),[op('SHOPPING_IMPORT',{},null),op('SHOPPING_CHECK',{checked:true,templateIndex:0}),op('SHOPPING_CHECK',{checked:true,templateIndex:7})],true).data;
+ const checkout=op('CHECKOUT',{store:'A',purchasedOn:'2024-01-01',items:[
+  {templateIndex:0,productId:crypto.randomUUID(),newProduct:{name:'Frango',unit:'kg'},purchaseId:crypto.randomUUID(),quantity:1,total:5},
+  {templateIndex:7,productId:'missing',newProduct:null,purchaseId:crypto.randomUUID(),quantity:1,total:2}
+ ]});
+ const result=project(before,[checkout]);assert.equal(result.warnings.length,1);assert.equal(result.data.products.length,0);assert.equal(result.data.purchases.length,0);
+ assert.equal(result.data.shoppingList.items[0].checked,true);
+});
+test('checkout quantity suggestions do not guess ranges or package sizes',async()=>{
+ const {plannedAmount,checkoutDraft}=await import('../docs/model.mjs');
+ assert.deepEqual(plannedAmount('12 ou 24'),{quantity:'',unit:''});assert.deepEqual(plannedAmount('1 cx'),{quantity:'',unit:''});
+ assert.deepEqual(plannedAmount('3 kg'),{quantity:'3',unit:'kg'});assert.deepEqual(plannedAmount('3 kg','un'),{quantity:'',unit:'un'});
+ const data=project(emptyData(),[product(),op('SHOPPING_IMPORT',{},null),op('SHOPPING_CHECK',{checked:true,templateIndex:7})],true).data;
+ const draft=checkoutDraft(data,'2024-01-01');assert.equal(draft.items[0].productId,productId);assert.equal(draft.items[0].unit,'kg');assert.equal(draft.items[0].total,'');
+ assert.equal(data.purchases.length,0);
+});
+test('checkout rejects an invalid price before any stock can be changed',()=>{
+ const data=project(emptyData(),[op('SHOPPING_IMPORT',{},null),op('SHOPPING_CHECK',{checked:true,templateIndex:0})],true).data;
+ const checkout=op('CHECKOUT',{store:'A',purchasedOn:'2024-01-01',items:[{templateIndex:0,productId:crypto.randomUUID(),newProduct:{name:'Frango',unit:'kg'},purchaseId:crypto.randomUUID(),quantity:1,total:0}]});
+ assert.throws(()=>project(data,[checkout],true));assert.equal(data.purchases.length,0);assert.equal(data.products.length,0);
+});

@@ -19,5 +19,5 @@ jobs:
         with:
           node-version: '22'
       - run: node --check docs/app.js
-      - run: node --check docs/store.mjs && node --check docs/model.mjs && node --check docs/sw.js
+      - run: node --check docs/store.mjs && node --check docs/model.mjs && node --check docs/checkout.mjs && node --check docs/sw.js
       - run: node tests/model.test.mjs

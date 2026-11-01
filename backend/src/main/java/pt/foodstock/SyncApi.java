@@ -32,6 +32,14 @@ class SyncApi {
 
 @Service
 class SyncService {
+    record CheckoutProduct(@NotBlank @Size(max=120) String name,@NotNull @Pattern(regexp="kg|L|un") String unit) {}
+    record CheckoutLine(@Size(max=80) String shoppingId,@Min(0) @Max(38) Integer templateIndex,
+                        @NotNull UUID productId,@Valid CheckoutProduct newProduct,
+                        @NotNull UUID purchaseId,
+                        @NotNull @DecimalMin(value="0",inclusive=false) @Digits(integer=9,fraction=3) java.math.BigDecimal quantity,
+                        @NotNull @DecimalMin(value="0",inclusive=false) @Digits(integer=9,fraction=2) java.math.BigDecimal total) {}
+    record Checkout(@NotBlank @Size(max=120) String store,@NotNull @PastOrPresent java.time.LocalDate purchasedOn,
+                    @NotNull @Size(min=1,max=100) List<@NotNull @Valid CheckoutLine> items) {}
     record ShoppingChange(@NotNull @Size(max=120) String quantityText, @NotNull @Size(max=250) String notes,
                           @NotNull String expectedQuantityText,@NotNull String expectedNotes,
                           @Min(0) @Max(38) Integer templateIndex) {}
@@ -73,6 +81,7 @@ class SyncService {
                 case "PRODUCT_CREATE" -> stock.addProductWithId(entityUuid(op.entityId()),decode(op.data(),NewProduct.class));
                 case "PURCHASE_CREATE" -> stock.addPurchaseWithId(entityUuid(op.entityId()),decode(op.data(),NewPurchase.class));
                 case "CONSUME" -> stock.consume(entityUuid(op.entityId()),decode(op.data(),Consumption.class));
+                case "CHECKOUT" -> checkout(decode(op.data(),Checkout.class));
                 case "SHOPPING_IMPORT" -> shopping.importTemplate();
                 case "SHOPPING_CHECK" -> {
                     var value=decode(op.data(),ShoppingCheck.class);
@@ -98,6 +107,24 @@ class SyncService {
                            : db.query("SELECT id FROM shopping_items WHERE id=?",(r,n)->r.getString(1),id);
         if(ids.isEmpty())throw problem(HttpStatus.NOT_FOUND,"Item da lista não encontrado. Importa a lista antes de sincronizar as marcações.");
         return ids.getFirst();
+    }
+    private void checkout(Checkout value) {
+        var ids=new ArrayList<String>();var seen=new HashSet<String>();var purchases=new HashSet<UUID>();
+        // Lock and validate the whole selection before creating products or expenses.
+        for(var line:value.items()) {
+            String id=shoppingId(line.shoppingId(),line.templateIndex());
+            if(!seen.add(id)||!purchases.add(line.purchaseId()))throw problem(HttpStatus.BAD_REQUEST,"Um item está repetido nesta finalização.");
+            boolean checked=Boolean.TRUE.equals(db.queryForObject("SELECT checked FROM shopping_items WHERE id=? FOR UPDATE",Boolean.class,id));
+            if(!checked)throw problem(HttpStatus.CONFLICT,"Um dos itens já foi finalizado ou desmarcado noutra sessão. A compra local foi preservada para resolução.");
+            ids.add(id);
+        }
+        int index=0;
+        for(var line:value.items()) {
+            if(line.newProduct()!=null) stock.addProductWithId(line.productId().toString(),new NewProduct(
+                line.newProduct().name(),line.newProduct().unit(),java.math.BigDecimal.ZERO,java.math.BigDecimal.ZERO));
+            stock.addPurchaseWithId(line.purchaseId().toString(),new NewPurchase(line.productId().toString(),line.quantity(),line.total(),value.store(),value.purchasedOn()));
+            db.update("UPDATE shopping_items SET checked=FALSE WHERE id=?",ids.get(index++));
+        }
     }
     private String entityUuid(String value) {
         try { return UUID.fromString(value).toString(); } catch(Exception e) { throw problem(HttpStatus.BAD_REQUEST,"Identificador de registo inválido."); }

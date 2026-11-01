@@ -144,6 +144,15 @@ form { margin-top: var(--space-lg); }
 #sync-pending li > div { min-width: 0; overflow-wrap: break-word; }
 #sync-pending strong { font-weight: 500; }
 .shopping-description { margin-top: var(--space-xs); max-width: 65ch; }
+.shopping-actions,.checkout-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); }
+.checkout-panel { background: var(--color-paper-2); color: var(--color-ink); border-radius: var(--radius-card); padding: var(--space-md); margin-top: var(--space-lg); scroll-margin-top: var(--space-md); }
+.checkout-panel > .muted { margin-top: var(--space-sm); }
+.checkout-lines { display: grid; gap: var(--space-lg); }
+.checkout-line { min-width: 0; margin: 0; padding: var(--space-md) 0 0; border: 0; border-top: 1px solid var(--color-rule); }
+.checkout-line legend { font-weight: 500; font-size: var(--text-lg); padding: 0 var(--space-xs) 0 0; overflow-wrap: break-word; min-width: 0; max-width: 100%; }
+.checkout-line .hint { margin-top: var(--space-xs); }
+.checkout-footer { border-top: 1px solid var(--color-rule); margin-top: var(--space-lg); padding-top: var(--space-lg); }
+.checkout-footer output { display: inline-block; margin-left: var(--space-sm); }
 .shopping-help { margin-bottom: var(--space-sm); }
 .shopping-help summary { display: flex; align-items: center; width: fit-content; cursor: pointer; color: var(--color-muted); text-decoration: underline; }
 #shopping-status { padding-block: var(--space-md); font-size: var(--text-sm); font-weight: 500; border-bottom: 1px solid var(--color-rule-2); }

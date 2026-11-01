@@ -118,6 +118,53 @@ async function eventually(fn,timeout=25000){const end=Date.now()+timeout;let las
   assert.match(await p.locator('#metrics').innerText(),/7,60/);await p.screenshot({path:path.join(shots,'offline-dashboard-desktop.png')});
   await p.setViewportSize({width:390,height:844});await p.screenshot({path:path.join(shots,'offline-dashboard-mobile.png')});
   assert.deepEqual(errors,[]);log('seven responsive widths, exact offline statistics, no uncaught JavaScript errors');
+
+  await p.route('**/api/sync/**',route=>route.abort());
+  await p.getByRole('link',{name:'Lista',exact:true}).click();
+  await p.getByRole('checkbox',{name:'Frango no carrinho',exact:true}).check();
+  await p.getByRole('checkbox',{name:'Arroz no carrinho',exact:true}).check();await pending(p,2);
+  await p.getByRole('button',{name:'Finalizar compras',exact:true}).click();
+  const checkout=p.locator('#checkout-form'),chicken=checkout.locator('[data-line="0"]'),rice=checkout.locator('[data-line="1"]');
+  assert.equal(await chicken.locator('[name=quantity]').inputValue(),'');assert.equal(await chicken.locator('[name=unit]').inputValue(),'');
+  await checkout.locator('[name=store]').fill('Loja finalização');await checkout.locator('[name=purchasedOn]').fill('2024-02-01');
+  await chicken.locator('[name=unit]').selectOption('kg');await chicken.locator('[name=quantity]').fill('1.2');await chicken.locator('[name=total]').fill('6');
+  await rice.locator('[name=productId]').selectOption(productId);await rice.locator('[name=quantity]').fill('1');await rice.locator('[name=total]').fill('2');
+  assert.equal(await rice.locator('[name=unit]').isDisabled(),true);
+  await eventually(async()=>{const v=await profile(p);return v.checkoutDraft?.items[1]?.total==='2';});
+  assert.equal((await json('/export')).purchases.length,4);
+  await checkout.getByRole('button',{name:'Guardar para depois'}).click();await p.locator('#checkout-panel').waitFor({state:'hidden'});assert.equal(await p.locator('#checkout-panel').isHidden(),true);
+  await p.reload();await p.locator('#checkout-form').waitFor();
+  assert.equal(await checkout.locator('[name=store]').inputValue(),'Loja finalização');assert.equal(await chicken.locator('[name=quantity]').inputValue(),'1.2');
+  await rice.locator('[name=total]').fill('0');await checkout.getByRole('button',{name:'Confirmar compras',exact:true}).click();assert.equal((await profile(p)).pending.length,2);
+  await rice.locator('[name=total]').fill('2');await eventually(async()=>((await profile(p)).checkoutDraft?.items[1]?.total)==='2');
+  for(const width of [320,390]){await p.setViewportSize({width,height:844});for(const field of await checkout.locator('input:visible,select:visible,button:visible').all()){const box=await field.boundingBox();assert.ok(box.x>=0&&box.x+box.width<=width+1,'checkout control outside mobile viewport');}}
+  await p.screenshot({path:path.join(shots,'checkout-mobile.png'),fullPage:true});
+  await checkout.getByRole('button',{name:'Confirmar compras',exact:true}).evaluate(button=>{button.click();button.click();});
+  await pending(p,3);await p.locator('#checkout-panel').waitFor({state:'hidden'});assert.equal(await p.locator('#checkout-panel').isHidden(),true);
+  let local=await p.evaluate(async()=>{const {LocalStore}=await import('./store.mjs');const s=new LocalStore(localStorage.getItem('foodstock-api'));try{return await s.view();}finally{s.close();}});
+  assert.equal(local.data.products.length,2);assert.equal(local.data.purchases.length,6);assert.equal(local.data.products.find(v=>v.id===productId).stock,3.25);
+  assert.equal(local.data.products.find(v=>v.name==='Frango').stock,1.2);assert.equal(local.profile.checkoutDraft,null);
+  assert.equal(await p.getByRole('button',{name:'Finalizar compras',exact:true}).isDisabled(),true);
+  log('checkout offline: draft survives reload; actual quantities and prices required; one atomic save creates/reuses foods and clears the selected marks');
+  await p.unroute('**/api/sync/**');let checkoutStage=0;
+  await p.route('**/api/sync/operations',async route=>{
+   const body=route.request().method()==='POST'?route.request().postDataJSON():null;
+   if(body?.kind==='CHECKOUT'&&checkoutStage===0){checkoutStage=1;await route.fulfill({status:400,headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':origin},body:JSON.stringify({message:'Tipo de alteração desconhecido.'})});}
+   else if(body?.kind==='CHECKOUT'&&checkoutStage===1){await route.fetch();checkoutStage=2;await route.abort();}
+   else await route.continue();
+  });
+  await p.evaluate(()=>dispatchEvent(new Event('focus')));await eventually(()=>checkoutStage===1);await pending(p,1);
+  assert.equal((await profile(p)).pending[0].error,undefined);
+  await p.reload();await eventually(()=>checkoutStage===2);await pending(p,1);
+  assert.equal((await json('/export')).purchases.length,6);
+  await p.evaluate(()=>dispatchEvent(new Event('focus')));await pending(p,0);
+  remote=await json('/export');assert.equal(remote.products.length,2);assert.equal(remote.purchases.length,6);
+  assert.equal(remote.products.find(v=>v.id===productId).stock,3.25);assert.equal(remote.products.find(v=>v.name==='Frango').stock,1.2);
+  assert.equal(remote.shoppingList.items.filter(v=>v.checked).length,0);
+  await p.getByRole('link',{name:'Resumo',exact:true}).click();await p.locator('#year').fill('2024');await p.locator('#year').press('Tab');await p.getByText('Total de 2024').waitFor();
+  assert.match(await p.locator('#metrics').innerText(),/15,60/);assert.deepEqual(errors,[]);
+  log('checkout sync: old API rejection is retried after upgrade; lost batch response and reopen cannot duplicate stock or expenses');
+
  }finally{
   if(context)await context.close();await stopApi();await new Promise(r=>site.close(r));await fs.rm(tmp,{recursive:true,force:true});
  }

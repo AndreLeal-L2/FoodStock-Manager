@@ -31,10 +31,14 @@ export class LocalStore extends EventTarget {
  async view(){const profile=await access(this.key);return {...project(profile.base,profile.pending),profile,connected:this.connected,syncing:this.running};}
  changed(broadcast=true){if(this.closed)return;this.dispatchEvent(new Event('change'));if(broadcast)this.channel?.postMessage(this.key);}
  async enqueue(kind,entityId,data){
-  const operation={operationId:crypto.randomUUID(),kind,entityId,data,createdAt:new Date().toISOString()};
+  const operation={operationId:kind==='CHECKOUT'?entityId:crypto.randomUUID(),kind,entityId,data,createdAt:new Date().toISOString()};
   await access(this.key,profile=>{
+   const existing=profile.pending.find(op=>op.operationId===operation.operationId);
+   if(existing){if(existing.kind!==kind||JSON.stringify(existing.data)!==JSON.stringify(data))throw Error('Esta finalização já foi guardada com outros valores. Consulta o histórico antes de voltar a registar.');return profile;}
    project(profile.base,[...profile.pending,operation],true);
-   profile.pending.push(operation);return profile;
+   profile.pending.push(operation);
+   if(kind==='CHECKOUT'&&profile.checkoutDraft?.id===entityId)profile.checkoutDraft=null;
+   return profile;
   });
   this.changed();this.sync().catch(()=>this.changed(false));return operation;
  }
@@ -68,7 +72,9 @@ export class LocalStore extends EventTarget {
      const current=await access(this.key),op=current.pending[0];if(!op||op.error)break;
      try {await this.request('operations',{...op,createdAt:undefined,error:undefined,instanceId:current.instanceId});}
      catch(error) {
-      if(error.status>=400&&error.status<500){await access(this.key,p=>{const entry=p.pending.find(v=>v.operationId===op.operationId);if(entry)entry.error=error.message;return p;});}
+      const unsupported=error.status===400&&error.message.startsWith('Tipo de alteração desconhecido');
+      if(unsupported)error.message='Atualiza e reinicia a API Java para sincronizar estas alterações. Continuam guardadas no navegador.';
+      if(error.status>=400&&error.status<500&&!unsupported){await access(this.key,p=>{const entry=p.pending.find(v=>v.operationId===op.operationId);if(entry)entry.error=error.message;return p;});}
       throw error;
      }
      // A queued operation is removed only by a snapshot acknowledging its durable receipt.
@@ -88,5 +94,7 @@ export class LocalStore extends EventTarget {
  async retry(){await access(this.key,p=>{if(p.pending[0])delete p.pending[0].error;return p;});this.changed();await this.sync();}
  async discard(id){await access(this.key,p=>{p.pending=p.pending.filter(op=>op.operationId!==id);return p;});this.changed();this.sync().catch(()=>this.changed(false));}
  async backup(){const view=await this.view();return {schemaVersion:3,exportedAt:new Date().toISOString(),apiUrl:this.apiUrl,data:view.data,profile:view.profile};}
+ async saveCheckoutDraft(draft){await access(this.key,p=>{p.checkoutDraft=draft;return p;});}
+ async clearCheckoutDraft(id){await access(this.key,p=>{if(p.checkoutDraft?.id===id)p.checkoutDraft=null;return p;});}
  close(){this.closed=true;this.controller.abort();this.channel?.close();}
 }

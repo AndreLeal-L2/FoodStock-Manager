@@ -19,7 +19,15 @@ Despensa doméstica com API Java local e interface estática para GitHub Pages. 
 
 Na vista **Lista de compras**, usa **Carregar a tua lista** para importar a lista fornecida. A importação é feita uma única vez: repetir o pedido não duplica itens nem apaga alterações. Quantidades como “12 ou 24”, “1 cx” e “6/10” são preservadas como planeamento, sem presumir tamanhos de embalagens. Os itens sem quantidade aparecem como **Por definir**. A indicação sobre legumes congelados pertence à categoria.
 
-Podes marcar itens como **no carrinho** e editar a quantidade planeada e as notas. Tudo é guardado primeiro no navegador; as alterações seguem para a base local da API quando houver ligação. Isto não cria produtos, movimenta estoque ou regista despesas: depois de pagar, usa **Compras** com a quantidade real, o preço, a data e a loja. A exportação JSON do navegador inclui esta lista, a cópia do servidor e todas as alterações por enviar (`schemaVersion: 3`).
+Podes marcar itens como **no carrinho** e editar a quantidade planeada e as notas. A marcação por si só não altera o stock nem os gastos. Depois de pagar, usa **Finalizar compras**:
+
+1. Confirma a loja e a data da compra.
+2. Em cada item marcado, escolhe um alimento existente ou confirma o nome e a unidade de um novo alimento. Indica a quantidade real e o **total pago por esse item**, não o preço unitário. Intervalos e embalagens ambíguas não são convertidos automaticamente.
+3. Usa **Confirmar compras** para registar todo o conjunto. Os alimentos novos são criados, as quantidades entram no stock e os valores entram nas estatísticas. Os itens ficam desmarcados na lista para a próxima compra.
+
+O formulário guarda o rascunho no navegador; podes usar **Guardar para depois** e continuar mais tarde. Nada entra no histórico antes da confirmação. A finalização é uma operação única, aplicada por inteiro na cópia local e numa transação na API. Uma falha ou um reenvio não cria compras parciais ou duplicadas. Se outra sessão já tiver finalizado/desmarcado um dos itens, a operação fica pendente para resolução.
+
+Tudo funciona com a API desligada. A finalização segue automaticamente quando a API atualizada estiver disponível; uma API antiga que ainda não reconheça a operação não apaga a fila. A exportação JSON inclui a lista, o rascunho, a cópia do servidor e todas as alterações por enviar (`schemaVersion: 3`). **Compras** continua disponível para registos avulsos.
 
 ## Executar no macOS
 
@@ -113,7 +121,7 @@ Esta configuração tem de ser executada nos teus dispositivos. O ambiente de de
 
 ## Como registar e interpretar dados
 
-- Cria primeiro o alimento. Mantém a unidade consistente: duas embalagens de 500 g de arroz = **1 kg**; regista o total pago pelas duas. Para dúzias de ovos em `un`, regista 12.
+- Em **Finalizar compras**, podes criar o alimento durante a confirmação. Para um registo avulso em **Compras**, cria-o primeiro na despensa. Mantém a unidade consistente: duas embalagens de 500 g de arroz = **1 kg**; regista o total pago pelas duas. Para dúzias de ovos em `un`, regista 12.
 - Estoque inicial representa o que já tens e **não** gera despesa. Se quiseres incluir o preço dessa compra no histórico, começa com estoque zero e regista a compra. Evita contar a mesma quantidade duas vezes.
 - Valores monetários usam decimal exato com até 2 casas; quantidades aceitam até 3. Não são permitidos preços zero, quantidades negativas ou datas futuras.
 - A variação de preço usa `(último preço/unidade − anterior) / anterior × 100`. Uma descida tem sinal negativo. Ex.: 0,5 kg por €2 → €4/kg; depois 2 kg por €6 → €3/kg, descida de 25%.

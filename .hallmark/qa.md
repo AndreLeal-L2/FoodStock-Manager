@@ -40,3 +40,11 @@ As legendas curtas da navegação inferior mantêm destinos e títulos de págin
 O primeiro acesso precisa dos ficheiros da interface. Uma página fechada/suspensa não pode garantir pedidos contínuos: a fila persiste e a tentativa retoma ao abrir/voltar. Apagar dados do site apaga a cópia desse navegador; o backup JSON inclui pendências, mas ainda não tem importador automático.
 
 Para sincronizar no telemóvel com a API no Mac, é preciso um endereço HTTPS alcançável pelo telefone. O README descreve Tailscale Serve privado. Essa configuração e as permissões reais de Safari/iOS dependem dos dispositivos do utilizador; aqui foi validado o fluxo no Chromium com API local. A API instalada no Mac precisa de ser atualizada para o novo protocolo.
+
+## Atualização: Finalizar compras
+
+A lista passou a permitir confirmar os itens marcados num único formulário com loja, data, alimento existente/novo, unidade, quantidade real e total pago por item. Quantidades ambíguas e preços não são presumidos. O rascunho é guardado no navegador e pode ser retomado. Só a confirmação cria entradas no stock e nas despesas; os itens confirmados ficam desmarcados para a próxima compra.
+
+A confirmação é uma operação `CHECKOUT` indivisível na projeção local e na transação da API, com o recibo idempotente já existente. Não há registos parciais se falhar uma linha. Uma segunda finalização dos mesmos itens já desmarcados é rejeitada; um reenvio do mesmo identificador devolve o recibo anterior. Uma API antiga que ainda não conheça `CHECKOUT` deixa a operação pendente para nova tentativa, sem a apagar.
+
+Validação desta atualização: 22 testes Java e 10 testes de modelo local aprovados. A suite de navegador cobre rascunho após reload, preços obrigatórios, criação/reutilização de alimentos, confirmação dupla offline, API antiga, resposta perdida após gravar todo o conjunto e atualização das estatísticas sem duplicação. Foi corrigido um evento de campo que podia ocorrer ao fechar o formulário já guardado; o teste mantém a exigência de zero erros JavaScript. Os testes usam bases temporárias e não alteram os dados reais.

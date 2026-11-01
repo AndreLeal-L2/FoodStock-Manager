@@ -57,9 +57,10 @@
       </div>
     </section>
     <section id="shopping" class="view" hidden>
-      <div class="section-heading"><h2>O que levar do supermercado</h2><button id="import-shopping" type="button">Carregar a tua lista</button></div>
-      <details class="shopping-help"><summary>Como usar a lista</summary><p class="muted shopping-description">A tua lista, organizada por categoria. Quantidades e alternativas por decidir ficam em aberto.</p><p class="hint">Marcar um item como “no carrinho” não altera o estoque nem os gastos. Depois de pagar, regista a quantidade real e o valor em Compras.</p></details>
+      <div class="section-heading"><h2>O que levar do supermercado</h2><div class="shopping-actions"><button id="import-shopping" type="button">Carregar a tua lista</button><button id="checkout-open" type="button" disabled>Finalizar compras</button></div></div>
+      <details class="shopping-help"><summary>Como usar a lista</summary><p class="muted shopping-description">A tua lista, organizada por categoria. Quantidades e alternativas por decidir ficam em aberto.</p><p class="hint">Marca os itens no carrinho e usa Finalizar compras para confirmar quantidades, preços, loja e data. Só depois de confirmares entram no stock e nos gastos.</p></details>
       <p id="shopping-status" role="status"></p>
+      <article id="checkout-panel" class="checkout-panel" hidden aria-label="Finalização das compras"></article>
       <div id="shopping-items"></div>
     </section>
     <section id="purchases" class="view" hidden>

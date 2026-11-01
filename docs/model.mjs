@@ -18,11 +18,34 @@ function validateOperation(op) {
   case 'CONSUME':decimal(b.quantity,3,true);text(b.reason,200,true);break;
   case 'SHOPPING_CHECK':if(typeof b.checked!=='boolean')throw Error('Marcação inválida.');break;
   case 'SHOPPING_DETAILS':text(b.quantityText,120);text(b.notes,250);text(b.expectedQuantityText,120);text(b.expectedNotes,250);break;
+  case 'CHECKOUT':
+   if(!Array.isArray(b.items)||!b.items.length||b.items.length>100)throw Error('Seleciona pelo menos um item para finalizar.');
+   for(const line of b.items) {
+    validateOperation({kind:'PURCHASE_CREATE',data:{store:b.store,purchasedOn:b.purchasedOn,quantity:line.quantity,total:line.total}});
+    if(line.newProduct)validateOperation({kind:'PRODUCT_CREATE',data:{...line.newProduct,initialStock:0,minimumStock:0}});
+    if(typeof line.productId!=='string'||typeof line.purchaseId!=='string')throw Error('Identificador de compra inválido.');
+   }
+   break;
  }
 }
 export function templateItems() {
  let index=0;
  return template.groups.flatMap(group=>group.items.map(item=>({...item,id:`template-${index}`,templateIndex:index++,category:group.category,categoryNote:group.note,checked:false})));
+}
+export function plannedAmount(text,existingUnit='') {
+ const match=String(text||'').trim().match(/^(\d+(?:[.,]\d{1,3})?)\s*(kg|l|un)?$/i);
+ if(!match)return {quantity:'',unit:existingUnit};
+ const plannedUnit=match[2]?(match[2].toLowerCase()==='l'?'L':match[2].toLowerCase()):'';
+ return {quantity:existingUnit&&plannedUnit&&existingUnit!==plannedUnit?'':match[1].replace(',','.'),unit:existingUnit||plannedUnit};
+}
+export function checkoutDraft(data,today) {
+ const items=data.shoppingList.items.filter(item=>item.checked).map(item=>{
+  const matches=data.products.filter(p=>p.name.trim().toLocaleLowerCase('pt-PT')===item.name.trim().toLocaleLowerCase('pt-PT'));
+  const product=matches.length===1?matches[0]:null;
+  return {shoppingId:item.id,templateIndex:item.templateIndex,name:item.name,planned:item.quantityText,
+   productId:product?.id||'',newProductId:crypto.randomUUID(),purchaseId:crypto.randomUUID(),...plannedAmount(item.quantityText,product?.unit),total:''};
+ });
+ return {id:crypto.randomUUID(),store:data.purchases[0]?.store||'',purchasedOn:today,items};
 }
 export function applyOperation(data,op) {
  validateOperation(op);
@@ -51,6 +74,19 @@ export function applyOperation(data,op) {
    break;
   case 'SHOPPING_CHECK': item().checked=body.checked;break;
   case 'SHOPPING_DETAILS': {const i=item();i.quantityText=body.quantityText.trim();i.notes=body.notes.trim();break;}
+  case 'CHECKOUT': {
+   const next=structuredClone(data),seen=new Set(),purchaseIds=new Set();
+   for(const line of body.items) {
+    const selected=next.shoppingList.items.find(i=>line.templateIndex!=null?i.templateIndex===line.templateIndex:i.id===line.shoppingId);
+    if(!selected||!selected.checked)throw Error('Um dos itens já foi finalizado ou desmarcado. Revê os itens selecionados.');
+    if(seen.has(selected.id)||purchaseIds.has(line.purchaseId)||next.purchases.some(p=>p.id===line.purchaseId))throw Error('Esta compra ou este item já foi registado.');
+    seen.add(selected.id);purchaseIds.add(line.purchaseId);
+    if(line.newProduct)applyOperation(next,{...op,kind:'PRODUCT_CREATE',entityId:line.productId,data:{...line.newProduct,initialStock:0,minimumStock:0}});
+    applyOperation(next,{...op,kind:'PURCHASE_CREATE',entityId:line.purchaseId,data:{productId:line.productId,quantity:line.quantity,total:line.total,store:body.store,purchasedOn:body.purchasedOn}});
+    selected.checked=false;
+   }
+   Object.assign(data,next);break;
+  }
   default:throw Error('Alteração local desconhecida. Exporta os dados antes de atualizar.');
  }
  return data;
