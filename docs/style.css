@@ -128,6 +128,25 @@ form { margin-top: var(--space-lg); }
 .settings-data button { margin-top: var(--space-lg); }
 footer { display: flex; justify-content: space-between; gap: var(--space-lg); margin-top: var(--space-2xl); padding-top: var(--space-lg); border-top: 1px solid var(--color-rule); font-size: var(--text-xs); color: var(--color-muted); }
 footer span:first-child { font-weight: 500; }
+.shopping-description { margin-top: var(--space-xs); max-width: 65ch; }
+#shopping-status { padding-block: var(--space-md); font-size: var(--text-sm); font-weight: 500; border-bottom: 2px solid var(--color-ink); }
+.shopping-category { margin-top: var(--space-xl); }
+.shopping-category > .muted { margin-top: var(--space-xs); }
+.shopping-list { list-style: none; padding: 0; margin: var(--space-md) 0 0; }
+.shopping-item { padding-block: var(--space-md); border-bottom: 1px solid var(--color-rule); }
+.shopping-line { display: flex; justify-content: space-between; align-items: center; gap: var(--space-md); }
+.shopping-check { display: flex; align-items: center; gap: var(--space-sm); margin: 0; font-size: var(--text-md); min-width: 0; cursor: pointer; }
+.shopping-check input { width: 24px; min-width: 24px; min-height: 44px; margin: 0; padding: 0; accent-color: var(--color-green); cursor: pointer; }
+.shopping-check input:focus-visible { outline-offset: 3px; }
+.shopping-name, .shopping-quantity { overflow-wrap: break-word; min-width: 0; }
+.shopping-quantity { font-size: var(--text-sm); color: var(--color-muted); text-align: right; font-variant-numeric: tabular-nums; }
+.is-checked .shopping-name { color: var(--color-muted); text-decoration: line-through; }
+.shopping-notes { font-size: var(--text-sm); color: var(--color-muted); margin-left: var(--space-xl); }
+.shopping-edit { margin-left: var(--space-xl); font-size: var(--text-sm); }
+.shopping-edit summary { display: flex; align-items: center; width: fit-content; cursor: pointer; color: var(--color-muted); text-decoration: underline; text-underline-offset: .2em; }
+.shopping-edit summary:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.shopping-edit summary:hover { color: var(--color-ink); }
+.shopping-edit form { max-width: 640px; padding: var(--space-md); margin-block: var(--space-sm); background: var(--color-paper-2); border-radius: var(--radius-pill); }
 @media (max-width: 70rem) {
   main { padding: var(--space-lg); }
   .overview-grid { grid-template-columns: minmax(0, 1fr); }

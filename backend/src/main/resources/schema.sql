@@ -22,3 +22,19 @@ CREATE TABLE IF NOT EXISTS movements (
  reason VARCHAR(200) NOT NULL,
  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS shopping_list_state (
+ id INTEGER PRIMARY KEY,
+ template_imported BOOLEAN NOT NULL DEFAULT FALSE
+);
+INSERT INTO shopping_list_state(id,template_imported)
+ SELECT 1,FALSE WHERE NOT EXISTS (SELECT 1 FROM shopping_list_state WHERE id=1);
+CREATE TABLE IF NOT EXISTS shopping_items (
+ id VARCHAR(36) PRIMARY KEY,
+ category VARCHAR(120) NOT NULL,
+ category_note VARCHAR(250) NOT NULL,
+ name VARCHAR(120) NOT NULL,
+ quantity_text VARCHAR(120) NOT NULL,
+ notes VARCHAR(250) NOT NULL,
+ checked BOOLEAN NOT NULL DEFAULT FALSE,
+ sort_order INTEGER NOT NULL
+);

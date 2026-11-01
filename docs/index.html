@@ -19,6 +19,7 @@
       <nav aria-label="Navegação">
         <a href="#overview"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg><span>Visão geral</span></a>
         <a href="#stock"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v16H4zM7 2v6m10-6v6M4 11h16M9 15h6"/></svg><span>A minha despensa</span></a>
+        <a href="#shopping"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h12M9 12h12M9 19h12M3 5l1 1 2-2M3 12l1 1 2-2M3 19l1 1 2-2"/></svg><span>Lista de compras</span></a>
         <a href="#purchases"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12l2 14H4L6 7zM9 7V5a3 3 0 0 1 6 0v2"/></svg><span>Compras</span></a>
         <a href="#prices"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3v17h17M8 15l4-5 4 2 4-7"/></svg><span>Preços e lojas</span></a>
         <a href="#settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18M3 17h18M8 4v6m8 4v6"/></svg><span>Ligação e dados</span></a>
@@ -54,6 +55,12 @@
           <form id="consume-form"><label>Alimento<select name="productId" class="product-options" required></select></label><label>Quantidade na unidade do produto<input name="quantity" type="number" min="0.001" max="999999999" step="0.001" required></label><label>Motivo<select name="reason"><option>Consumo</option><option>Desperdício</option><option>Doação</option></select></label><button class="secondary">Retirar do estoque</button></form>
         </article>
       </div>
+    </section>
+    <section id="shopping" class="view" hidden>
+      <div class="section-heading"><div><h2>O que levar do supermercado</h2><p class="muted shopping-description">A tua lista, organizada por categoria. Quantidades e alternativas por decidir ficam em aberto.</p></div><button id="import-shopping" type="button">Carregar a tua lista</button></div>
+      <p class="hint">Marcar um item como “no carrinho” não altera o estoque nem os gastos. Depois de pagar, regista a quantidade real e o valor em Compras.</p>
+      <p id="shopping-status" role="status"></p>
+      <div id="shopping-items"></div>
     </section>
     <section id="purchases" class="view" hidden>
       <article class="form-panel purchase-entry"><div class="form-intro"><h2>Registar uma compra</h2><p class="muted">Cada linha do talão é uma compra. O estoque é atualizado automaticamente.</p></div>

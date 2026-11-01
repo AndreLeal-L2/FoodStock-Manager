@@ -12,7 +12,8 @@ import org.springframework.web.bind.annotation.*;
 class Api {
     private final StockService service;
     private final JdbcTemplate db;
-    Api(StockService service,JdbcTemplate db) { this.service=service;this.db=db; }
+    private final ShoppingService shopping;
+    Api(StockService service,JdbcTemplate db,ShoppingService shopping) { this.service=service;this.db=db;this.shopping=shopping; }
     @GetMapping("/health") Map<String,String> health() { db.queryForObject("SELECT 1",Integer.class);return Map.of("status","ok"); }
     @GetMapping("/products") List<Product> products() { return service.products(); }
     @PostMapping("/products") @ResponseStatus(HttpStatus.CREATED)
@@ -23,5 +24,14 @@ class Api {
     @PostMapping("/products/{id}/consume") @ResponseStatus(HttpStatus.NO_CONTENT)
     void consume(@PathVariable String id,@Valid @RequestBody Consumption c) { service.consume(id,c); }
     @GetMapping("/stats") Map<String,Object> stats(@RequestParam int year) { return service.statistics(year); }
-    @GetMapping("/export") Map<String,Object> export() { return service.export(); }
+    @GetMapping("/shopping-list") ShoppingService.ShoppingList shoppingList() { return shopping.list(); }
+    @PostMapping("/shopping-list/import") ShoppingService.ShoppingList importShoppingList() { return shopping.importTemplate(); }
+    @PostMapping("/shopping-list/{id}/check") @ResponseStatus(HttpStatus.NO_CONTENT)
+    void checkShoppingItem(@PathVariable String id,@Valid @RequestBody ShoppingService.Check value) { shopping.check(id,value); }
+    @PostMapping("/shopping-list/{id}/details") @ResponseStatus(HttpStatus.NO_CONTENT)
+    void shoppingDetails(@PathVariable String id,@Valid @RequestBody ShoppingService.Details value) { shopping.details(id,value); }
+    @GetMapping("/export") Map<String,Object> export() {
+        var result=new LinkedHashMap<>(service.export());
+        result.put("schemaVersion",2);result.put("shoppingList",shopping.list());return result;
+    }
 }

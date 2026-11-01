@@ -1,6 +1,6 @@
 # Design: FoodStock
 
-Shared system for the five application views. It takes the welcoming notebook material of Hallmark Furrow while keeping app controls familiar and compact.
+Shared system for the application views. It takes the welcoming notebook material of Hallmark Furrow while keeping app controls familiar and compact.
 
 ## System
 

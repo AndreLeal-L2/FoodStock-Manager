@@ -10,6 +10,13 @@ Despensa doméstica com API Java local e interface estática para GitHub Pages. 
 - Gastos mensais, variação contra o mês anterior (incluindo dezembro/janeiro), total anual e comparação com o ano anterior.
 - Último preço por unidade, variação contra a compra anterior e melhor preço/loja/data de todo o histórico.
 - Gastos por loja, alertas de reposição e exportação JSON.
+- Lista de compras planeadas com 39 itens em 9 categorias, notas e quantidades editáveis e marcação de itens no carrinho.
+
+## A tua lista de compras
+
+Na vista **Lista de compras**, usa **Carregar a tua lista** para importar a lista fornecida. A importação é feita uma única vez: repetir o pedido não duplica itens nem apaga alterações. Quantidades como “12 ou 24”, “1 cx” e “6/10” são preservadas como planeamento, sem presumir tamanhos de embalagens. Os itens sem quantidade aparecem como **Por definir**. A indicação sobre legumes congelados pertence à categoria.
+
+Podes marcar itens como **no carrinho** e editar a quantidade planeada e as notas. Tudo fica na base local da API, incluindo depois de reiniciar. Isto não cria produtos, movimenta estoque ou regista despesas: depois de pagar, usa **Compras** com a quantidade real, o preço, a data e a loja. A exportação JSON inclui também esta lista (`schemaVersion: 2`). A lista não faz importação de despesas, nem tem sincronização offline: precisa da API ligada, tal como o resto da aplicação.
 
 ## Executar no macOS
 
@@ -91,6 +98,10 @@ Configuração opcional: `PORT` (padrão 8080), `FOODSTOCK_DB_URL` (URL JDBC H2)
 | POST | `/api/products/{id}/consume` | Retirar quantidade com motivo |
 | GET / POST | `/api/purchases` | Consultar / registar compra |
 | GET | `/api/stats?year=2026` | Gastos e preços normalizados |
+| GET | `/api/shopping-list` | Lista planeada e estado de importação |
+| POST | `/api/shopping-list/import` | Carregar a lista fornecida, sem duplicados |
+| POST | `/api/shopping-list/{id}/check` | Marcar ou desmarcar no carrinho |
+| POST | `/api/shopping-list/{id}/details` | Editar quantidade planeada e notas |
 | GET | `/api/export` | Exportação JSON |
 
 ```sh
