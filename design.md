@@ -45,3 +45,7 @@ Shared system for six application views. The user explicitly replaced the previo
 ## Exports
 
 `docs/tokens.css`, `docs/base.css`, `docs/style.css`; domain projection in `docs/model.mjs`, durable storage/synchronization in `docs/store.mjs`, page wiring in `docs/app.js`, offline shell in `docs/sw.js`.
+
+## Supabase and photography update
+
+The six navigation destinations and blue/grey palette remain. Supabase setup, account controls and explicit legacy migration live in Dados. Photo capture and recognition review live in Despensa, using the existing form surface. Recognition has distinct prepared, analysing, review, saved and error states. Counts describe total inventory rather than purchases; no recognition result changes stock until the user reviews and confirms it. IndexedDB profiles are isolated per project/account; photos are transient and are not cached by the service worker.

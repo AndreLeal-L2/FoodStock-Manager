@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {emptyData,project,statistics,templateItems} from '../docs/model.mjs';
+import {emptyData,project,statistics,templateItems,applyOperation} from '../docs/model.mjs';
 import template from '../docs/shopping-template.mjs';
 const productId='21ba286f-cb8d-4a7d-8e2b-1e5dbfd74d25';
 const op=(kind,data,entityId=productId)=>({operationId:crypto.randomUUID(),kind,data,entityId,createdAt:new Date().toISOString()});
@@ -73,4 +73,14 @@ test('checkout rejects an invalid price before any stock can be changed',()=>{
  const data=project(emptyData(),[op('SHOPPING_IMPORT',{},null),op('SHOPPING_CHECK',{checked:true,templateIndex:0})],true).data;
  const checkout=op('CHECKOUT',{store:'A',purchasedOn:'2024-01-01',items:[{templateIndex:0,productId:crypto.randomUUID(),newProduct:{name:'Frango',unit:'kg'},purchaseId:crypto.randomUUID(),quantity:1,total:0}]});
  assert.throws(()=>project(data,[checkout],true));assert.equal(data.purchases.length,0);assert.equal(data.products.length,0);
+});
+
+test('inventory counts replace quantities without creating expenses, repeat safely and reject stale counts atomically',()=>{
+ const base=emptyData(),id=crypto.randomUUID();
+ applyOperation(base,{kind:'PRODUCT_CREATE',entityId:id,data:{name:'Arroz',unit:'kg',initialStock:5,minimumStock:0}});
+ const capture={kind:'INVENTORY_CAPTURE',data:{items:[{productId:id,expectedStock:5,quantity:2,category:'Hidratos e acompanhamentos',brand:''}]}};
+ applyOperation(base,capture);assert.equal(base.products[0].stock,2);assert.equal(base.purchases.length,0);
+ assert.throws(()=>applyOperation(base,capture),/stock mudou/);assert.equal(base.products[0].stock,2);
+ const bad={kind:'INVENTORY_CAPTURE',data:{items:[{productId:id,expectedStock:2,quantity:4,category:'Outros',brand:''},{productId:crypto.randomUUID(),expectedStock:0,quantity:1,category:'Outros',brand:''}]}};
+ assert.throws(()=>applyOperation(base,bad),/não encontrado/);assert.equal(base.products[0].stock,2);
 });

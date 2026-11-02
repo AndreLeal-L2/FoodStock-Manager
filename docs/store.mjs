@@ -11,7 +11,7 @@ function openDatabase() {
  });
  return opening;
 }
-async function access(key,change) {
+export async function access(key,change) {
  const db=await openDatabase();
  return new Promise((resolve,reject)=>{
   const tx=change?db.transaction('profiles','readwrite',{durability:'strict'}):db.transaction('profiles','readonly');const store=tx.objectStore('profiles');let result;
@@ -25,32 +25,33 @@ async function access(key,change) {
 }
 class ApiError extends Error {constructor(message,status){super(message);this.status=status;}}
 export class LocalStore extends EventTarget {
- constructor(apiUrl){super();this.apiUrl=apiUrl;this.key='primary';this.running=false;this.connected=false;this.closed=false;this.controller=new AbortController();this.channel=typeof BroadcastChannel!=='undefined'?new BroadcastChannel('foodstock-offline'):null;
+ constructor(cloud){super();this.cloud=cloud;this.apiUrl=cloud.config?.url||'';this.key=cloud.profileKey;this.running=false;this.connected=false;this.closed=false;this.controller=new AbortController();this.channel=typeof BroadcastChannel!=='undefined'?new BroadcastChannel('foodstock-offline'):null;
   if(this.channel)this.channel.onmessage=e=>{if(e.data===this.key)this.changed(false);};
  }
  async view(){const profile=await access(this.key);return {...project(profile.base,profile.pending),profile,connected:this.connected,syncing:this.running};}
  changed(broadcast=true){if(this.closed)return;this.dispatchEvent(new Event('change'));if(broadcast)this.channel?.postMessage(this.key);}
  async enqueue(kind,entityId,data){
-  const operation={operationId:kind==='CHECKOUT'?entityId:crypto.randomUUID(),kind,entityId,data,createdAt:new Date().toISOString()};
+  if(this.closed)throw Error('A conta mudou. Volta a abrir a conta original para concluir.');
+  const operation={operationId:['CHECKOUT','INVENTORY_CAPTURE'].includes(kind)?entityId:crypto.randomUUID(),kind,entityId,data,createdAt:new Date().toISOString()};
   await access(this.key,profile=>{
    const existing=profile.pending.find(op=>op.operationId===operation.operationId);
    if(existing){if(existing.kind!==kind||JSON.stringify(existing.data)!==JSON.stringify(data))throw Error('Esta finalização já foi guardada com outros valores. Consulta o histórico antes de voltar a registar.');return profile;}
    project(profile.base,[...profile.pending,operation],true);
    profile.pending.push(operation);
    if(kind==='CHECKOUT'&&profile.checkoutDraft?.id===entityId)profile.checkoutDraft=null;
+   if(kind==='INVENTORY_CAPTURE'&&profile.photoDraft?.id===entityId)profile.photoDraft=null;
    return profile;
   });
   this.changed();this.sync().catch(()=>this.changed(false));return operation;
  }
  async request(path,body){
+  if(this.closed||this.key!==this.cloud.profileKey)throw new ApiError('A conta ou o projeto mudou. Os dados locais foram preservados.',401);
   const controller=new AbortController(),cancel=()=>controller.abort();
   if(this.controller.signal.aborted)controller.abort();
   this.controller.signal.addEventListener('abort',cancel,{once:true});
-  const timeout=setTimeout(cancel,4000);
+  const timeout=setTimeout(cancel,20000);
   try {
-   const response=await fetch(this.apiUrl+'/api/sync/'+path,{method:'POST',credentials:'omit',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:controller.signal});
-   if(!response.ok){let data;try{data=await response.json();}catch{}throw new ApiError(data?.message||(response.status===404?'Atualiza e reinicia a API Java para ativar a sincronização.':`A API respondeu ${response.status}.`),response.status);}
-   return await response.json();
+   return await this.cloud.request(path,body,controller.signal);
   }finally{clearTimeout(timeout);this.controller.signal.removeEventListener('abort',cancel);}
  }
  async pull(){
@@ -63,7 +64,7 @@ export class LocalStore extends EventTarget {
   this.connected=true;this.changed();
  }
  async sync(){
-  if(this.running||this.closed)return;this.running=true;this.changed(false);
+  if(this.running||this.closed||!this.cloud.user)return;this.running=true;this.changed(false);
   const work=async()=>{
    try {
     await this.pull();
@@ -73,8 +74,8 @@ export class LocalStore extends EventTarget {
      try {await this.request('operations',{...op,createdAt:undefined,error:undefined,instanceId:current.instanceId});}
      catch(error) {
       const unsupported=error.status===400&&error.message.startsWith('Tipo de alteração desconhecido');
-      if(unsupported)error.message='Atualiza e reinicia a API Java para sincronizar estas alterações. Continuam guardadas no navegador.';
-      if(error.status>=400&&error.status<500&&!unsupported){await access(this.key,p=>{const entry=p.pending.find(v=>v.operationId===op.operationId);if(entry)entry.error=error.message;return p;});}
+      if(unsupported)error.message='O esquema do Supabase precisa de ser atualizado para sincronizar esta alteração. Os dados continuam no navegador.';
+      if(error.status>=400&&error.status<500&&![401,403,408,429].includes(error.status)&&!unsupported){await access(this.key,p=>{const entry=p.pending.find(v=>v.operationId===op.operationId);if(entry)entry.error=error.message;return p;});}
       throw error;
      }
      // A queued operation is removed only by a snapshot acknowledging its durable receipt.
@@ -82,7 +83,7 @@ export class LocalStore extends EventTarget {
     }
    } catch(error) {
     if(this.closed)return;
-    this.connected=false;await access(this.key,p=>{p.lastError=error.status?error.message:'A API ainda não está disponível. As alterações continuam guardadas neste navegador.';return p;});
+    this.connected=false;await access(this.key,p=>{p.lastError=error.status?error.message:'Sem ligação ao Supabase. As alterações continuam guardadas neste navegador.';return p;});
    } finally {this.running=false;this.changed();}
   };
   if(navigator.locks) {
@@ -93,7 +94,27 @@ export class LocalStore extends EventTarget {
  }
  async retry(){await access(this.key,p=>{if(p.pending[0])delete p.pending[0].error;return p;});this.changed();await this.sync();}
  async discard(id){await access(this.key,p=>{p.pending=p.pending.filter(op=>op.operationId!==id);return p;});this.changed();this.sync().catch(()=>this.changed(false));}
- async backup(){const view=await this.view();return {schemaVersion:3,exportedAt:new Date().toISOString(),apiUrl:this.apiUrl,data:view.data,profile:view.profile};}
+ async backup(){const view=await this.view();return {schemaVersion:3,exportedAt:new Date().toISOString(),source:'supabase',projectUrl:this.apiUrl,data:view.data,profile:view.profile};}
+ async savePhotoDraft(draft){await access(this.key,p=>{p.photoDraft=draft;return p;});}
+ async clearPhotoDraft(id){await access(this.key,p=>{if(p.photoDraft?.id===id)p.photoDraft=null;return p;});}
+ async importData(data){
+  if(!this.cloud.user)throw Error('Inicia sessão antes de importar para a nuvem.');
+  if(data&&!(data.products?.length||data.purchases?.length||data.movements?.length||data.shoppingList?.templateImported))throw Error('Não há dados para importar nesta cópia.');
+  const current=await this.view();if(current.profile.pending.length)throw Error('Sincroniza ou resolve as alterações pendentes antes de importar.');
+  const profile=await access(this.key,p=>{
+   if(!p.importDraft){if(!data)throw Error('Não há importação pendente.');p.importDraft={id:crypto.randomUUID(),data};}
+   else if(data&&JSON.stringify(p.importDraft.data)!==JSON.stringify(data))throw Error('Retoma primeiro a importação pendente. Os dados novos não foram enviados.');
+   return p;
+  });
+  this.changed();
+  if(this.closed||this.key!==this.cloud.profileKey)throw new ApiError('A conta mudou. Retoma a importação na conta original.',401);
+  await this.cloud.rpc('foodstock_import',{p_import_id:profile.importDraft.id,p_data:profile.importDraft.data});
+  await this.pull();
+  await access(this.key,p=>{p.importDraft=null;return p;});
+ }
+ async cancelImport(){await access(this.key,p=>{p.importDraft=null;return p;});this.changed();}
+ async legacy(){const p=await access('primary');const value=project(p.base,p.pending);if(value.warnings.length)throw Error('Resolve as alterações pendentes na cópia anterior antes de migrar. Exporta um backup para preservar tudo.');return value.data;}
+
  async saveCheckoutDraft(draft){await access(this.key,p=>{p.checkoutDraft=draft;return p;});}
  async clearCheckoutDraft(id){await access(this.key,p=>{if(p.checkoutDraft?.id===id)p.checkoutDraft=null;return p;});}
  close(){this.closed=true;this.controller.abort();this.channel?.close();}

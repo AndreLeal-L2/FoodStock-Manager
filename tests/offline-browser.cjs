@@ -1,171 +1,89 @@
-// End-to-end validation with a temporary H2 database and an isolated browser profile.
-// Requires mvn verify, npm ci, a JDK 21+ and a Chromium executable.
+// Real Chromium + local PostgreSQL (PGlite). Supabase HTTP/Auth/vision boundaries
+// are simulated; no external project, AI key or personal data is used.
 const {chromium}=require('playwright');
-const assert=require('node:assert/strict');
-const fs=require('node:fs/promises');
-const path=require('node:path');
-const os=require('node:os');
-const http=require('node:http');
-const net=require('node:net');
-const {spawn}=require('node:child_process');
-const {once}=require('node:events');
-const root=path.resolve(__dirname,'..');
+const assert=require('node:assert/strict');const fs=require('node:fs/promises');const path=require('node:path');const os=require('node:os');const http=require('node:http');const {once}=require('node:events');const {randomUUID}=require('node:crypto');
+const root=path.resolve(__dirname,'..'),cloudUrl='https://foodstock-test.supabase.co';
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
-async function freePort(){const s=net.createServer();s.listen(0,'127.0.0.1');await once(s,'listening');const port=s.address().port;await new Promise(r=>s.close(r));return port;}
-async function eventually(fn,timeout=25000){const end=Date.now()+timeout;let last;while(Date.now()<end){try{const result=await fn();if(result)return result;}catch(e){last=e;}await wait(100);}throw last||Error('Timed out waiting for expected state');}
+async function eventually(fn,ms=15000){const deadline=Date.now()+ms;let last;while(Date.now()<deadline){try{const value=await fn();if(value)return value;}catch(e){last=e;}await wait(80);}throw last||Error('Timed out');}
 (async()=>{
- const tmp=await fs.mkdtemp(path.join(os.tmpdir(),'foodstock-offline-'));
- const docs=path.join(root,'docs');
- const site=http.createServer(async(req,res)=>{
-  try{
-   let file=decodeURIComponent(new URL(req.url,'http://test').pathname);if(file.endsWith('/'))file+='index.html';
-   const target=path.resolve(docs,'.'+file);if(!target.startsWith(docs+path.sep))throw Error('Invalid path');
-   const body=await fs.readFile(target),ext=path.extname(target);
-   res.writeHead(200,{'Content-Type':({'.html':'text/html','.css':'text/css','.js':'text/javascript','.mjs':'text/javascript','.ttf':'font/ttf'})[ext]||'application/octet-stream'});res.end(body);
-  }catch{res.writeHead(404);res.end();}
- });
- site.listen(0,'127.0.0.1');await once(site,'listening');
- const origin=`http://127.0.0.1:${site.address().port}`,apiPort=await freePort(),api=`http://127.0.0.1:${apiPort}`;
- const java=process.env.FOODSTOCK_JAVA||(process.env.JAVA_HOME?path.join(process.env.JAVA_HOME,'bin/java'):'java');
- const jar=process.env.FOODSTOCK_JAR||path.join(root,'backend/target/foodstock-0.1.0.jar');
- const executablePath=process.env.FOODSTOCK_BROWSER||'/usr/bin/chromium';
- let server,context;
- const launch=()=>chromium.launchPersistentContext(path.join(tmp,'browser'),{executablePath,headless:true,args:['--no-sandbox'],viewport:{width:390,height:844}});
- async function startApi(){
-  server=spawn(java,['-jar',jar],{cwd:path.join(root,'backend'),env:{...process.env,PORT:String(apiPort),FOODSTOCK_DB_URL:`jdbc:h2:file:${path.join(tmp,'database')}`,FOODSTOCK_ALLOWED_ORIGINS:origin},stdio:['ignore','pipe','pipe']});
-  const log=[];server.stdout.on('data',d=>log.push(String(d)));server.stderr.on('data',d=>log.push(String(d)));
-  await eventually(async()=>{if(server.exitCode!=null)throw Error(log.join('').slice(-4000));return (await fetch(api+'/api/health')).ok;});
- }
- async function stopApi(){if(server&&server.exitCode==null){server.kill('SIGTERM');await once(server,'exit');}server=null;}
- const profile=p=>p.evaluate(()=>new Promise((resolve,reject)=>{const open=indexedDB.open('foodstock-offline-v1',1);open.onsuccess=()=>{const db=open.result,tx=db.transaction('profiles'),get=tx.objectStore('profiles').get('primary');get.onsuccess=()=>resolve(get.result);get.onerror=()=>reject(get.error);tx.oncomplete=()=>db.close();};open.onerror=()=>reject(open.error);}));
- const pending=(p,n)=>eventually(async()=>{const v=await profile(p);return v?.pending.length===n&&v;});
- const json=async route=>(await fetch(api+'/api'+route)).json();
- const log=message=>console.log('PASS:',message);
- const errors=[];
+ const {PGlite}=await import('@electric-sql/pglite');const db=new PGlite();
+ const alice=randomUUID(),bob=randomUUID(),users={alice:{id:alice,email:'alice@example.com'},bob:{id:bob,email:'bob@example.com'}};
+ await db.exec("create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;");
+ await db.query('insert into auth.users values($1),($2)',[alice,bob]);await db.exec(await fs.readFile(path.join(root,'supabase/migrations/202611020001_foodstock.sql'),'utf8'));
+ let queue=Promise.resolve();const locked=fn=>{const p=queue.then(fn);queue=p.catch(()=>{});return p;};
+ const sqlRpc=(user,name,args)=>locked(async()=>{await db.query("select set_config('request.jwt.claim.sub',$1,false)",[user.id]);return (await db.query(`select public.${name}(${args.map((_,i)=>'$'+(i+1)).join(',')}) result`,args)).rows[0].result;});
+ const snapshot=user=>sqlRpc(user,'foodstock_snapshot',[null,[]]);
+ const docs=path.join(root,'docs'),tmp=await fs.mkdtemp(path.join(os.tmpdir(),'foodstock-cloud-'));
+ const site=http.createServer(async(req,res)=>{try{let file=new URL(req.url,'http://test').pathname;if(file.endsWith('/'))file+='index.html';const full=path.resolve(docs,'.'+decodeURIComponent(file));if(!full.startsWith(docs+path.sep))throw Error();res.writeHead(200,{'Content-Type':({'.html':'text/html','.js':'text/javascript','.mjs':'text/javascript','.css':'text/css','.ttf':'font/ttf'})[path.extname(full)]||'application/octet-stream'});res.end(await fs.readFile(full));}catch{res.writeHead(404);res.end();}});
+ site.listen(0,'127.0.0.1');await once(site,'listening');const origin=`http://127.0.0.1:${site.address().port}`;
+ let context,online=true,loseNext=false,visionCalls=0,authRefreshes=0;
+ const errors=[];const requests=[];
+ const launch=async()=>{
+  const ctx=await chromium.launchPersistentContext(path.join(tmp,'browser'),{executablePath:process.env.FOODSTOCK_BROWSER||'/usr/bin/chromium',headless:true,args:['--no-sandbox'],viewport:{width:390,height:844}});
+  ctx.on('page',page=>{page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>requests.push(r.url()));});
+  await ctx.route(cloudUrl+'/**',async route=>{
+   if(!online)return route.abort('connectionrefused');
+   const req=route.request(),url=new URL(req.url()),body=req.postDataJSON(),token=req.headers().authorization?.replace('Bearer ','');
+   const user=Object.values(users).find(u=>token==='token-'+u.id);
+   const reply=(data,status=200)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(data)});
+   if(url.pathname==='/auth/v1/token'){
+    let u;if(url.searchParams.get('grant_type')==='refresh_token'){u=Object.values(users).find(u=>body.refresh_token==='refresh-'+u.id);authRefreshes++;}else u=Object.values(users).find(u=>u.email===body.email&&body.password==='password123');
+    if(!u)return reply({message:'Email ou palavra-passe inválidos.'},400);
+    return reply({access_token:'token-'+u.id,refresh_token:'refresh-'+u.id,expires_in:3600,user:u});
+   }
+   if(url.pathname==='/auth/v1/signup')return reply({user:users.alice});
+   if(url.pathname==='/auth/v1/logout')return reply({});
+   if(!user)return reply({message:'Unauthorized'},401);
+   if(url.pathname==='/functions/v1/recognize-food'){
+    assert.match(body.image,/^data:image\/jpeg;base64,/);visionCalls++;
+    return reply({requiresReview:true,items:[{name:'Arroz',category:'Hidratos e acompanhamentos',brand:'',visibleCount:2,quantity:null,unit:null,notes:'Peso ilegível.'},{name:'Feijão',category:'Conservas e leguminosas',brand:'',visibleCount:3,quantity:null,unit:'un',notes:''}]});
+   }
+   try{
+    const name=url.pathname.split('/').pop();let args;
+    if(name==='foodstock_snapshot')args=[body.p_expected_instance_id,body.p_pending_ids];
+    else if(name==='foodstock_apply')args=[body.p_operation];
+    else if(name==='foodstock_import')args=[body.p_import_id,body.p_data];
+    else return reply({message:'Not found'},404);
+    const result=await sqlRpc(user,name,args);
+    if(loseNext&&name==='foodstock_apply'){loseNext=false;online=false;return route.abort('failed');}
+    return reply(result);
+   }catch(e){return reply({message:e.message,code:e.code},e.code==='40001'?409:400);}
+  });return ctx;
+ };
+ async function profile(page){return page.evaluate(()=>new Promise((resolve,reject)=>{const r=indexedDB.open('foodstock-offline-v1',1);r.onsuccess=()=>{const db=r.result,tx=db.transaction('profiles'),get=tx.objectStore('profiles').getAll();get.onsuccess=()=>resolve(get.result);get.onerror=()=>reject(get.error);tx.oncomplete=()=>db.close();};}));}
+ const current=async p=>(await profile(p)).find(v=>v.key===`supabase:${cloudUrl}:${alice}`);
+ const pending=(p,n)=>eventually(async()=>{const v=await current(p);return v?.pending.length===n&&v;});
+ const log=msg=>console.log('PASS:',msg);
  try{
-  context=await launch();await context.addInitScript(url=>localStorage.setItem('foodstock-api',url),api);
-  let p=context.pages()[0];p.on('pageerror',e=>errors.push(e.message));
-  await p.goto(origin+'/#shopping');await p.getByRole('button',{name:'Carregar a tua lista'}).click();
-  await p.locator('.shopping-item').nth(38).waitFor();
-  const eggs=p.locator('.shopping-item').filter({has:p.getByRole('checkbox',{name:'Ovos no carrinho',exact:true})});
-  await eggs.getByRole('checkbox').check();await pending(p,2);
-  await eggs.locator('summary').click();await eggs.locator('[name=quantityText]').fill('24');await eggs.locator('[name=notes]').fill('Do telefone <script>');await eggs.getByRole('button',{name:'Guardar alterações'}).click();await pending(p,3);
-  await p.getByRole('link',{name:'Despensa',exact:true}).click();
-  await p.locator('#product-form [name=name]').fill('Arroz offline');await p.locator('#product-form button').click();await pending(p,4);
-  await p.getByRole('link',{name:'Compras',exact:true}).click();
-  const productId=await p.locator('#purchase-form select option').nth(1).getAttribute('value');
-  async function buy(page,q,total){
-   await page.locator('#purchase-form select').selectOption(productId);
-   for(const [name,value]of Object.entries({quantity:q,total,store:'Mercearia teste',purchasedOn:'2024-01-01'}))await page.locator(`#purchase-form [name=${name}]`).fill(value);
-   await page.locator('#purchase-form button').click();
-  }
-  await buy(p,'1.5','3.60');await pending(p,5);
-  await p.getByRole('link',{name:'Despensa',exact:true}).click();await p.locator('#consume-form select[name=productId]').selectOption(productId);await p.locator('#consume-form [name=quantity]').fill('0.25');await p.locator('#consume-form button').click();await pending(p,6);
-  await p.evaluate(()=>navigator.serviceWorker.ready);
-  await p.reload();await p.locator('#inventory td').getByText('1,25 kg',{exact:true}).waitFor();
-  await context.setOffline(true);await p.reload();await p.locator('#inventory td').getByText('1,25 kg',{exact:true}).waitFor();
-  await p.getByRole('link',{name:'Lista',exact:true}).click();await eggs.getByRole('checkbox').uncheck();await pending(p,7);
-  await p.getByRole('link',{name:'Dados',exact:true}).click();const downloading=p.waitForEvent('download');await p.locator('#export').click();const download=await downloading;await download.saveAs(path.join(tmp,'backup.json'));
-  const backup=JSON.parse(await fs.readFile(path.join(tmp,'backup.json'),'utf8'));assert.equal(backup.profile.pending.length,7);assert.equal(backup.data.purchases.length,1);
-  log('API off: create product, purchase, consumption and shopping edits; full offline reload and JSON export');
-  await context.close();context=await launch();await context.setOffline(true);p=context.pages()[0];p.on('pageerror',e=>errors.push(e.message));
-  await p.goto(origin+'/#shopping');await p.locator('.shopping-item').nth(38).waitFor();assert.equal((await profile(p)).pending.length,7);assert.equal(await p.locator('#shopping-items script').count(),0);
-  log('browser restart retains all queued operations and the cached interface');
-  const draft=p.locator('form[data-shopping-index="5"]');await draft.locator('..').locator('summary').click();await draft.locator('[name=notes]').fill('Rascunho sem guardar');
-  await context.setOffline(false);await startApi();
-  // No manual sync click: the visible-page timer must notice that the API started.
-  await pending(p,0);await p.locator('#connection').filter({hasText:'Tudo sincronizado'}).waitFor();
-  let remote=await json('/export');assert.equal(remote.products.length,1);assert.equal(remote.purchases.length,1);assert.equal(remote.products[0].stock,1.25);
-  const syncedEggs=remote.shoppingList.items.find(i=>i.name==='Ovos');assert.equal(syncedEggs.checked,false);assert.equal(syncedEggs.quantityText,'24');assert.equal(syncedEggs.notes,'Do telefone <script>');
-  assert.equal(await p.locator('form[data-shopping-index="5"] [name=notes]').inputValue(),'Rascunho sem guardar');
-  assert.equal(await p.evaluate(()=>document.activeElement.name),'notes');await p.locator('.shopping-edit[open] summary').click();
-  log('API starts later: automatic timer sends the backlog once, preserving open drafts and keyboard focus across ID remapping');
-  let resolveLost;const lost=new Promise(r=>resolveLost=r);let drop=true;
-  await p.route('**/api/sync/operations',async route=>{
-   if(drop&&route.request().postDataJSON().kind==='PURCHASE_CREATE'){drop=false;await route.fetch();await route.abort();resolveLost();}else await route.continue();
-  });
-  await p.getByRole('link',{name:'Compras',exact:true}).click();await buy(p,'1','2');await lost;await pending(p,1);
-  await p.evaluate(()=>dispatchEvent(new Event('focus')));await pending(p,0);remote=await json('/export');assert.equal(remote.purchases.length,2);assert.equal(remote.products[0].stock,2.25);
-  await p.unroute('**/api/sync/operations');
-  log('response lost after commit: reconnect acknowledges the durable receipt without duplicating purchase or stock');
-  await p.route('**/api/sync/**',route=>route.abort());await p.getByRole('link',{name:'Despensa',exact:true}).click();
-  await p.locator('#consume-form select[name=productId]').selectOption(productId);await p.locator('#consume-form [name=quantity]').fill('2');await p.locator('#consume-form button').click();await pending(p,1);
-  const consumed=await fetch(api+`/api/products/${productId}/consume`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({quantity:1,reason:'Outro dispositivo'})});assert.equal(consumed.status,204);
-  await p.unroute('**/api/sync/**');await p.evaluate(()=>dispatchEvent(new Event('focus')));
-  await eventually(async()=>{const v=await profile(p);return v.pending[0]?.error;});
-  await p.reload();await p.getByRole('link',{name:'Dados',exact:true}).click();await p.locator('.pending-details summary').click();
-  assert.equal((await profile(p)).pending.length,1);p.once('dialog',d=>d.accept());await p.getByRole('button',{name:'Descartar',exact:true}).click();await pending(p,0);
-  remote=await json('/export');assert.equal(remote.products[0].stock,1.25);
-  log('conflicting consumption is retained across reload and requires explicit resolution');
-  const second=await context.newPage();second.on('pageerror',e=>errors.push(e.message));await second.goto(origin+'/#purchases');await second.locator('#connection').filter({hasText:'sincronizado'}).waitFor();
-  await p.getByRole('link',{name:'Compras',exact:true}).click();await Promise.all([buy(p,'0.5','1'),buy(second,'0.5','1')]);await pending(p,0);
-  remote=await json('/export');assert.equal(remote.purchases.length,4);assert.equal(remote.products[0].stock,2.25);await second.close();
-  log('two browser tabs preserve both operations without duplicate deliveries');
-  await p.getByRole('link',{name:'Despensa',exact:true}).click();
-  await p.evaluate(()=>{IDBObjectStore.prototype.put=function(){throw new DOMException('Teste de armazenamento cheio','QuotaExceededError');};});
-  await p.locator('#product-form [name=name]').fill('Não deve ser gravado');await p.locator('#product-form button').click();await p.locator('#message').filter({hasText:'armazenamento cheio'}).waitFor();
-  assert.equal((await json('/products')).length,1);await p.reload();
-  log('storage failure never reports success or sends an unsaved operation');
-  await stopApi();await startApi();await p.evaluate(()=>dispatchEvent(new Event('focus')));await pending(p,0);
-  remote=await json('/export');assert.equal(remote.purchases.length,4);assert.equal(remote.products[0].stock,2.25);
-  log('database and sync receipts survive a Java API restart');
-  await p.getByRole('link',{name:'Lista',exact:true}).click();await p.evaluate(()=>document.fonts.ready);
-  const shots=path.resolve(process.env.FOODSTOCK_SHOTS||path.join(root,'.hallmark/shots'));await fs.mkdir(shots,{recursive:true});
-  for(const width of [320,375,390,768,1024,1440,1920]){await p.setViewportSize({width,height:900});assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`overflow at ${width}`);}
-  await p.setViewportSize({width:390,height:844});await p.screenshot({path:path.join(shots,'offline-shopping-mobile.png')});
-  await p.setViewportSize({width:1440,height:900});await p.screenshot({path:path.join(shots,'offline-shopping-desktop.png')});
-  await p.getByRole('link',{name:'Resumo',exact:true}).click();await p.locator('#year').fill('2024');await p.locator('#year').press('Tab');await p.getByText('Total de 2024').waitFor();
-  assert.match(await p.locator('#metrics').innerText(),/7,60/);await p.screenshot({path:path.join(shots,'offline-dashboard-desktop.png')});
-  await p.setViewportSize({width:390,height:844});await p.screenshot({path:path.join(shots,'offline-dashboard-mobile.png')});
-  assert.deepEqual(errors,[]);log('seven responsive widths, exact offline statistics, no uncaught JavaScript errors');
-
-  await p.route('**/api/sync/**',route=>route.abort());
-  await p.getByRole('link',{name:'Lista',exact:true}).click();
-  await p.getByRole('checkbox',{name:'Frango no carrinho',exact:true}).check();
-  await p.getByRole('checkbox',{name:'Arroz no carrinho',exact:true}).check();await pending(p,2);
-  await p.getByRole('button',{name:'Finalizar compras',exact:true}).click();
-  const checkout=p.locator('#checkout-form'),chicken=checkout.locator('[data-line="0"]'),rice=checkout.locator('[data-line="1"]');
-  assert.equal(await chicken.locator('[name=quantity]').inputValue(),'');assert.equal(await chicken.locator('[name=unit]').inputValue(),'');
-  await checkout.locator('[name=store]').fill('Loja finalização');await checkout.locator('[name=purchasedOn]').fill('2024-02-01');
-  await chicken.locator('[name=unit]').selectOption('kg');await chicken.locator('[name=quantity]').fill('1.2');await chicken.locator('[name=total]').fill('6');
-  await rice.locator('[name=productId]').selectOption(productId);await rice.locator('[name=quantity]').fill('1');await rice.locator('[name=total]').fill('2');
-  assert.equal(await rice.locator('[name=unit]').isDisabled(),true);
-  await eventually(async()=>{const v=await profile(p);return v.checkoutDraft?.items[1]?.total==='2';});
-  assert.equal((await json('/export')).purchases.length,4);
-  await checkout.getByRole('button',{name:'Guardar para depois'}).click();await p.locator('#checkout-panel').waitFor({state:'hidden'});assert.equal(await p.locator('#checkout-panel').isHidden(),true);
-  await p.reload();await p.locator('#checkout-form').waitFor();
-  assert.equal(await checkout.locator('[name=store]').inputValue(),'Loja finalização');assert.equal(await chicken.locator('[name=quantity]').inputValue(),'1.2');
-  await rice.locator('[name=total]').fill('0');await checkout.getByRole('button',{name:'Confirmar compras',exact:true}).click();assert.equal((await profile(p)).pending.length,2);
-  await rice.locator('[name=total]').fill('2');await eventually(async()=>((await profile(p)).checkoutDraft?.items[1]?.total)==='2');
-  for(const width of [320,390]){await p.setViewportSize({width,height:844});for(const field of await checkout.locator('input:visible,select:visible,button:visible').all()){const box=await field.boundingBox();assert.ok(box.x>=0&&box.x+box.width<=width+1,'checkout control outside mobile viewport');}}
-  await p.screenshot({path:path.join(shots,'checkout-mobile.png'),fullPage:true});
-  await checkout.getByRole('button',{name:'Confirmar compras',exact:true}).evaluate(button=>{button.click();button.click();});
-  await pending(p,3);await p.locator('#checkout-panel').waitFor({state:'hidden'});assert.equal(await p.locator('#checkout-panel').isHidden(),true);
-  let local=await p.evaluate(async()=>{const {LocalStore}=await import('./store.mjs');const s=new LocalStore(localStorage.getItem('foodstock-api'));try{return await s.view();}finally{s.close();}});
-  assert.equal(local.data.products.length,2);assert.equal(local.data.purchases.length,6);assert.equal(local.data.products.find(v=>v.id===productId).stock,3.25);
-  assert.equal(local.data.products.find(v=>v.name==='Frango').stock,1.2);assert.equal(local.profile.checkoutDraft,null);
-  assert.equal(await p.getByRole('button',{name:'Finalizar compras',exact:true}).isDisabled(),true);
-  log('checkout offline: draft survives reload; actual quantities and prices required; one atomic save creates/reuses foods and clears the selected marks');
-  await p.unroute('**/api/sync/**');let checkoutStage=0;
-  await p.route('**/api/sync/operations',async route=>{
-   const body=route.request().method()==='POST'?route.request().postDataJSON():null;
-   if(body?.kind==='CHECKOUT'&&checkoutStage===0){checkoutStage=1;await route.fulfill({status:400,headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':origin},body:JSON.stringify({message:'Tipo de alteração desconhecido.'})});}
-   else if(body?.kind==='CHECKOUT'&&checkoutStage===1){await route.fetch();checkoutStage=2;await route.abort();}
-   else await route.continue();
-  });
-  await p.evaluate(()=>dispatchEvent(new Event('focus')));await eventually(()=>checkoutStage===1);await pending(p,1);
-  assert.equal((await profile(p)).pending[0].error,undefined);
-  await p.reload();await eventually(()=>checkoutStage===2);await pending(p,1);
-  assert.equal((await json('/export')).purchases.length,6);
-  await p.evaluate(()=>dispatchEvent(new Event('focus')));await pending(p,0);
-  remote=await json('/export');assert.equal(remote.products.length,2);assert.equal(remote.purchases.length,6);
-  assert.equal(remote.products.find(v=>v.id===productId).stock,3.25);assert.equal(remote.products.find(v=>v.name==='Frango').stock,1.2);
-  assert.equal(remote.shoppingList.items.filter(v=>v.checked).length,0);
-  await p.getByRole('link',{name:'Resumo',exact:true}).click();await p.locator('#year').fill('2024');await p.locator('#year').press('Tab');await p.getByText('Total de 2024').waitFor();
-  assert.match(await p.locator('#metrics').innerText(),/15,60/);assert.deepEqual(errors,[]);
-  log('checkout sync: old API rejection is retried after upgrade; lost batch response and reopen cannot duplicate stock or expenses');
-
- }finally{
-  if(context)await context.close();await stopApi();await new Promise(r=>site.close(r));await fs.rm(tmp,{recursive:true,force:true});
- }
-})().catch(error=>{console.error(error);process.exitCode=1;});
+  context=await launch();let page=await context.newPage();await page.goto(origin);await page.waitForFunction(()=>document.querySelector('#connection').textContent!=='A abrir os dados deste navegador…');
+  await page.locator('nav a[href="#stock"]').click();await page.locator('#product-form [name=name]').fill('Arroz');await page.locator('#product-form [name=initialStock]').fill('5');await page.locator('#product-form button').click();await eventually(async()=>assert.equal((await profile(page)).find(v=>v.key==='primary')?.pending.length,1)||true);
+  await page.locator('nav a[href="#settings"]').click();await page.locator('.settings-connection details summary').click();await page.locator('#supabase-url').fill(cloudUrl);await page.locator('#supabase-key').fill('sb_publishable_test');await page.locator('#settings-form button').click();
+  await page.locator('#auth-form [name=email]').fill(users.alice.email);await page.locator('#auth-form [name=password]').fill('password123');await page.locator('#auth-form button[value=login]').click();await pending(page,0);
+  await page.locator('#migrate-local').waitFor();page.once('dialog',d=>d.accept());await page.locator('#migrate-local').click();await eventually(async()=>(await snapshot(users.alice)).data.products.length===1);await eventually(async()=>(await current(page))?.base.products.length===1);
+  assert.equal((await snapshot(users.alice)).data.products[0].stock,5);assert.equal((await profile(page)).find(v=>v.key==='primary').pending.length,1);log('guest data migration preserves the original offline copy and exact stock');
+  online=false;await page.locator('nav a[href="#shopping"]').click();await page.locator('#import-shopping').click();await page.locator('[data-shopping-id="template-7"]').check();await page.locator('#checkout-open').click();await page.locator('#checkout-form [name=store]').fill('Continente');await page.locator('#checkout-form [name=purchasedOn]').fill('2026-01-01');await page.locator('#checkout-form [name=quantity]').fill('1');await page.locator('#checkout-form [name=total]').fill('2');await page.locator('#checkout-form [data-checkout-later]').click();await page.locator('#checkout-panel').waitFor({state:'hidden'});
+  await page.reload();await page.locator('nav a[href="#shopping"]').click();assert.equal(await page.locator('#checkout-form [name=store]').inputValue(),'Continente');await page.locator('#checkout-form button[type=submit]').click();await pending(page,3);await page.locator('#checkout-panel').waitFor({state:'hidden'});assert.equal((await current(page)).base.products[0].stock,5);
+  log('offline checkout draft survives reload, then saves one stock-and-expense operation');
+  await page.waitForFunction(()=>navigator.serviceWorker.controller!==null);await context.setOffline(true);await page.reload();await page.locator('nav a[href="#shopping"]').click();await pending(page,3);assert.match(await page.locator('#shopping-status').textContent(),/0 de 39/);await context.close();context=await launch();page=await context.newPage();await page.goto(origin);await pending(page,3);online=true;await page.locator('#refresh').click();await pending(page,0);let server=await snapshot(users.alice);assert.equal(server.data.products[0].stock,6);assert.equal(server.data.purchases.length,1);log('browser restart retains outbox; reconnect synchronizes once with authenticated Supabase');
+  await page.locator('nav a[href="#stock"]').click();const png=Buffer.from(await page.evaluate(()=>{const canvas=document.createElement('canvas');canvas.width=8;canvas.height=8;canvas.getContext('2d').fillRect(0,0,8,8);return canvas.toDataURL('image/png').split(',')[1];}),'base64');await page.locator('[data-photo-input]').first().setInputFiles({name:'pantry.png',mimeType:'image/png',buffer:png});await page.locator('#photo-analyze').click();await page.locator('#photo-review-form').waitFor();assert.equal(visionCalls,1);assert.equal((await snapshot(users.alice)).data.products.length,1);assert.equal(await page.locator('[data-photo-line="0"] [name=quantity]').inputValue(),'');
+  online=false;await page.locator('[data-photo-line="0"] [name=quantity]').fill('2');await page.locator('[data-photo-line="1"] [name=quantity]').fill('3');await page.locator('[data-photo-line="1"] [name=unit]').selectOption('un');await page.locator('[data-photo-line="1"] [name=quantity]').blur();await eventually(async()=>(await current(page))?.photoDraft?.items[1].quantity==='3');
+  await page.reload();await page.locator('nav a[href="#stock"]').click();await page.locator('#photo-review-form').waitFor();assert.equal(await page.locator('[data-photo-line="0"] [name=quantity]').inputValue(),'2');
+  await page.locator('#photo-review-form button[type=submit]').click();assert.equal((await current(page)).pending.length,0);await page.locator('#photo-review-form [name=reviewed]').check();
+  for(const width of [320,390,640,768,960,1024,1440]){await page.setViewportSize({width,height:900});const outside=await page.locator('#photo-review-form input, #photo-review-form select, #photo-review-form button').evaluateAll(nodes=>nodes.filter(n=>n.getClientRects().length).filter(n=>n.getBoundingClientRect().left<0||n.getBoundingClientRect().right>innerWidth+1).length);assert.equal(outside,0,'photo layout at '+width);}
+  await page.setViewportSize({width:390,height:844});await fs.mkdir(path.join(root,'.hallmark/shots'),{recursive:true});await page.screenshot({path:path.join(root,'.hallmark/shots/supabase-photo-mobile.png'),fullPage:true});
+  await page.locator('#photo-review-form button[type=submit]').evaluate(b=>{b.click();b.click();});await pending(page,1);assert.equal((await current(page)).pending[0].kind,'INVENTORY_CAPTURE');await page.locator('#photo-review').waitFor({state:'hidden'});log('photo analysis only suggests; mandatory review, offline draft, mobile layouts and one atomic inventory confirmation');
+  online=true;loseNext=true;await page.locator('#refresh').click();await eventually(async()=>(await snapshot(users.alice)).data.products.length===2);assert.equal((await current(page)).pending.length,1);online=true;await page.locator('#refresh').click();await pending(page,0);server=await snapshot(users.alice);assert.equal(server.data.products.find(p=>p.name==='Arroz').stock,2);assert.equal(server.data.products.find(p=>p.name==='Feijão').stock,3);assert.equal(server.data.purchases.length,1);log('lost response after inventory commit cannot duplicate stock; recount does not create expenses');
+  await page.locator('nav a[href="#settings"]').click();await page.locator('#signout').click();await page.locator('#auth-form').waitFor();await page.locator('#auth-form [name=email]').fill(users.bob.email);await page.locator('#auth-form [name=password]').fill('password123');await page.locator('#auth-form button[value=login]').click();await page.locator('#account-email').filter({hasText:users.bob.email}).waitFor();await page.locator('nav a[href="#stock"]').click();await eventually(async()=>!(await page.locator('#inventory').textContent()).includes('Arroz'));assert.equal((await snapshot(users.bob)).data.products.length,0);assert.equal((await snapshot(users.alice)).data.products.length,2);log('sign out and account switch isolate caches, drafts and cloud data');
+  await page.locator('nav a[href="#settings"]').click();const invalidBackup={schemaVersion:3,products:[{id:randomUUID(),name:'Inválido',unit:'g',stock:1,minimumStock:0}],purchases:[],movements:[]};page.once('dialog',d=>d.accept());await page.locator('#import-file').setInputFiles({name:'invalid-backup.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(invalidBackup))});await page.locator('#cancel-import').waitFor();await eventually(async()=>(await page.locator('#message').textContent()).includes('Unidade inválida'));page.once('dialog',d=>d.accept());await page.locator('#cancel-import').click();await page.locator('#cancel-import').waitFor({state:'hidden'});assert.equal((await snapshot(users.bob)).data.products.length,0);log('invalid import preserves cloud data and can be cancelled without losing the source');
+  // Expired cached sessions refresh before any cloud RPC, retaining the same account scope.
+  await page.evaluate(()=>{const key='foodstock-session:https://foodstock-test.supabase.co',s=JSON.parse(localStorage.getItem(key));s.expires_at=0;localStorage.setItem(key,JSON.stringify(s));});await page.reload();await eventually(()=>authRefreshes>0);log('expired sessions refresh securely before syncing');
+  online=false;await page.locator('nav a[href="#stock"]').click();
+  const before=(await profile(page)).find(v=>v.key.endsWith(':'+bob));
+  await page.evaluate(()=>{const original=IDBDatabase.prototype.transaction;window.restoreTransactions=()=>{IDBDatabase.prototype.transaction=original;};IDBDatabase.prototype.transaction=function(names,mode,options){if(mode==='readwrite')throw Error('simulated storage failure');return original.call(this,names,mode,options);};});
+  await page.locator('#product-form [name=name]').fill('Falha de armazenamento');await page.locator('#product-form button').click();await eventually(async()=>(await page.locator('#message').textContent()).includes('simulated storage failure'));await page.evaluate(()=>window.restoreTransactions());assert.deepEqual((await profile(page)).find(v=>v.key.endsWith(':'+bob)).pending,before.pending);assert.equal((await snapshot(users.bob)).data.products.length,0);log('storage failure cannot report a successful save or send unsaved data');
+  const second=await context.newPage();await second.goto(origin);await second.locator('nav a[href="#stock"]').click();
+  await page.locator('#product-form [name=name]').fill('Da primeira aba');await second.locator('#product-form [name=name]').fill('Da segunda aba');await Promise.all([page.locator('#product-form button').click(),second.locator('#product-form button').click()]);
+  await eventually(async()=>(await profile(page)).find(v=>v.key.endsWith(':'+bob))?.pending.length===2);online=true;await Promise.all([page.locator('#refresh').click(),second.locator('#refresh').click()]);await eventually(async()=>(await profile(page)).find(v=>v.key.endsWith(':'+bob))?.pending.length===0);assert.equal((await snapshot(users.bob)).data.products.length,2);await second.close();log('two tabs preserve both writes and synchronize without duplicates');
+  assert.equal(requests.some(url=>/localhost:8080|127\.0\.0\.1:8080/.test(url)),false);assert.deepEqual(errors,[]);log('no local Java dependency and no uncaught JavaScript errors');
+ }finally{await context?.close();await new Promise(r=>site.close(r));await db.close();await fs.rm(tmp,{recursive:true,force:true});}
+})().catch(e=>{console.error(e);process.exitCode=1;});

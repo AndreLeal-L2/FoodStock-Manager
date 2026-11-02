@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="dark">
-  <meta name="description" content="Organiza os alimentos de casa, regista as compras e compara gastos e preços por unidade com os dados guardados no teu computador.">
+  <meta name="description" content="Organiza os alimentos de casa, regista as compras e compara gastos e preços por unidade com dados privados sincronizados entre os teus dispositivos.">
   <title>FoodStock · A tua despensa, em dia</title>
   <link rel="preload" href="fonts/host-grotesk.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="stylesheet" href="style.css">
@@ -25,7 +25,7 @@
         <a href="#settings" data-title="Ligação e dados" title="Ligação e dados"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18M3 17h18M8 4v6m8 4v6"/></svg><span>Dados</span></a>
       </nav>
     </details>
-    <div class="local-note"><p>Guardado neste navegador.</p><p>As alterações são enviadas quando a tua API estiver disponível.</p></div>
+    <div class="local-note"><p>Guardado neste navegador.</p><p>Com sessão iniciada, as alterações sincronizam com o Supabase quando houver Internet.</p></div>
   </aside>
   <main>
     <header><h1 id="page-title">Visão geral</h1><button id="refresh" class="secondary" type="button">Sincronizar</button></header>
@@ -42,6 +42,13 @@
     </section>
     <section id="stock" class="view" hidden>
       <article class="inventory-panel"><div class="section-heading"><h2>Na despensa</h2><label class="search">Procurar<input id="search" type="search" placeholder="Nome do alimento"></label></div><div id="inventory"></div></article>
+      <article class="photo-panel form-panel"><h2>Identificar alimentos por fotografia</h2><p id="photo-requirements" class="muted"></p>
+        <p class="hint">Fotografa os alimentos separados, com rótulos visíveis e boa luz. A identificação pode falhar: vais rever os nomes, as categorias e as quantidades antes de guardar. A marca é opcional.</p>
+        <div class="photo-inputs"><label>Escolher imagem<input data-photo-input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif"></label><label>Tirar fotografia<input data-photo-input type="file" accept="image/*" capture="environment"></label></div>
+        <img id="photo-preview" class="photo-preview" alt="Fotografia escolhida para identificar alimentos" hidden><p id="photo-status" role="status"></p>
+        <button id="photo-analyze" type="button" disabled>Analisar fotografia</button><p class="hint">Ao analisar, a foto é enviada à função de reconhecimento e ao fornecedor de visão configurado. A aplicação não guarda a foto na base. A análise requer Internet e pode ter custo; a revisão fica guardada neste navegador.</p>
+        <section id="photo-review" hidden aria-label="Revisão dos alimentos identificados"></section>
+      </article>
       <div class="two-columns forms-grid">
         <article class="form-panel"><h2>Adicionar alimento</h2><p class="muted">Usa sempre a mesma unidade para este produto.</p>
           <form id="product-form">
@@ -71,7 +78,14 @@
     </section>
     <section id="prices" class="view" hidden><article class="prices-panel"><h2>Quanto custa, de verdade?</h2><p class="muted">Preço por unidade: a última compra comparada com a anterior. Melhores preços de todo o histórico, independentemente do ano selecionado.</p><p class="hint">Uma descida é uma oportunidade observada, não uma previsão de preços atuais. Compara o mesmo produto e a mesma qualidade.</p><div id="price-list"></div></article></section>
     <section id="settings" class="view" hidden>
-      <div class="settings-grid"><article class="settings-connection"><h2>Ligação à API local</h2><p>Podes registar dados com a API desligada. A aplicação tenta enviar as alterações ao abrir, ao voltar a este separador e a cada 15 segundos enquanto está visível.</p><form id="settings-form"><label>Endereço da API<input id="api-url" type="url" required placeholder="http://localhost:8080"></label><button>Guardar e ligar</button></form><p class="hint">No Mac, podes usar http://localhost:8080. No telemóvel, usa um endereço HTTPS que chegue à API do Mac. O navegador pode pedir autorização de acesso local; consulta o README se bloquear a ligação.</p></article><article class="settings-data"><h2>Os teus dados</h2><p>Moeda: EUR (€). A cópia deste navegador inclui alimentos, compras, lista e alterações ainda por enviar. Exporta um backup antes de limpar os dados do site ou mudar de dispositivo.</p><button id="export" class="secondary" type="button">Exportar dados JSON</button><p class="hint">A exportação funciona sem API. Esta versão ainda não importa o ficheiro JSON nem permite editar ou apagar compras.</p></article></div>
+      <div class="settings-grid"><article class="settings-connection"><h2>Sincronizar com Supabase</h2><p>A tua despensa pode acompanhar-te no Mac e no telemóvel, sem manter um computador ligado. Os dados continuam disponíveis offline.</p><p id="cloud-config-note" class="hint"></p>
+       <details><summary>Configurar o projeto</summary><form id="settings-form"><label>URL do projeto Supabase<input id="supabase-url" type="url" required placeholder="https://teu-projeto.supabase.co"></label><label>Chave pública publishable/anon<input id="supabase-key" type="text" required autocomplete="off" spellcheck="false" placeholder="sb_publishable_…"></label><p class="hint">Usa apenas a chave pública. A chave service_role, palavras-passe da base e chaves de IA ficam fora do site. O projeto precisa das migrações incluídas no repositório.</p><button>Guardar projeto</button></form></details>
+       <h3>A tua conta</h3><p id="account-note" class="hint"></p><form id="auth-form"><label>Email<input name="email" type="email" autocomplete="username" required></label><label>Palavra-passe<input name="password" type="password" minlength="8" maxlength="128" autocomplete="current-password" required></label><div class="checkout-actions"><button type="submit" value="login">Iniciar sessão</button><button type="submit" value="signup" class="secondary">Criar conta</button></div></form>
+       <div id="account-details" hidden><p>Sessão: <strong id="account-email"></strong></p><button id="signout" type="button" class="secondary">Terminar sessão neste navegador</button></div>
+      </article><article class="settings-data"><h2>Os teus dados</h2><p>Moeda: EUR (€). O backup inclui alimentos, compras, lista, rascunhos e alterações ainda por enviar. Não inclui credenciais da tua conta.</p><button id="export" class="secondary" type="button">Exportar dados JSON</button>
+       <h3>Migrar os dados anteriores</h3><p class="hint">Depois de iniciares sessão numa conta vazia, podes copiar os dados que já tinhas neste navegador ou importar um backup FoodStock. O stock atual é preservado e as compras antigas não voltam a somar quantidades. A cópia original permanece guardada.</p>
+       <button id="migrate-local" class="secondary" type="button" hidden>Migrar dados deste navegador</button><label>Importar backup JSON<input id="import-file" type="file" accept="application/json,.json" disabled></label><button id="resume-import" class="secondary" type="button" hidden>Retomar importação pendente</button><button id="cancel-import" class="secondary" type="button" hidden>Cancelar importação pendente</button><p class="hint">Faz a migração uma única vez, no navegador com os dados mais completos. Nos restantes dispositivos, inicia sessão na mesma conta para os receber. A importação recusa substituir uma conta com dados.</p>
+      </article></div>
       <article class="sync-panel"><h2>Sincronização</h2><p id="sync-summary" role="status"></p><p id="sync-last" class="muted"></p><p id="sync-error" class="sync-error"></p><button id="sync-retry" type="button" class="secondary">Tentar novamente</button><details class="pending-details"><summary>Alterações pendentes</summary><ul id="sync-pending"></ul></details><p id="offline-cache-note" class="hint">Depois do primeiro acesso, este navegador prepara a interface para abrir sem Internet. As tentativas de sincronização funcionam enquanto a página está aberta; voltam ao regressar.</p></article>
     </section>
     <footer><span>FoodStock</span><span>Uma despensa mais consciente, uma compra de cada vez.</span></footer>

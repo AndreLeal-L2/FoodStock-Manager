@@ -3,3 +3,10 @@ backend/data/
 .DS_Store
 *.log
 node_modules/
+
+# Local Supabase configuration and private credentials
+.env
+.env.*
+!.env.example
+supabase/.temp/
+supabase/.branches/

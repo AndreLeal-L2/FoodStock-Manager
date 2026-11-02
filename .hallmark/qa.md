@@ -1,5 +1,7 @@
 # FoodStock: revisão mobile e offline
 
+Nota: as secções iniciais registam validações históricas da API Java. O estado atual usa Supabase; ver a atualização no fim deste documento.
+
 A pedido do utilizador: redesenho Hallmark, fundo escuro com azul/cinzento, prioridade ao telemóvel e dados guardados no navegador, com envio posterior para a API. Skill oficial: [Nutlope/hallmark 2.0.0](https://github.com/Nutlope/hallmark/blob/4f6a46c6dc325d40ab268c93e25c7b96676ebccd/skills/hallmark/SKILL.md).
 
 ## Design
@@ -48,3 +50,14 @@ A lista passou a permitir confirmar os itens marcados num único formulário com
 A confirmação é uma operação `CHECKOUT` indivisível na projeção local e na transação da API, com o recibo idempotente já existente. Não há registos parciais se falhar uma linha. Uma segunda finalização dos mesmos itens já desmarcados é rejeitada; um reenvio do mesmo identificador devolve o recibo anterior. Uma API antiga que ainda não conheça `CHECKOUT` deixa a operação pendente para nova tentativa, sem a apagar.
 
 Validação desta atualização: 22 testes Java e 10 testes de modelo local aprovados. A suite de navegador cobre rascunho após reload, preços obrigatórios, criação/reutilização de alimentos, confirmação dupla offline, API antiga, resposta perdida após gravar todo o conjunto e atualização das estatísticas sem duplicação. Foi corrigido um evento de campo que podia ocorrer ao fechar o formulário já guardado; o teste mantém a exigência de zero erros JavaScript. Os testes usam bases temporárias e não alteram os dados reais.
+
+
+## Atualização: Supabase e revisão de fotografia
+
+A aplicação ativa deixou de chamar Java/localhost. Usa Supabase Auth e RPCs Postgres autenticadas, com RLS por conta nas sete tabelas públicas. A API Java permanece só como ferramenta de exportação/migração. As cópias IndexedDB são separadas por projeto e utilizador; sair ou trocar de conta não mistura os dados. Importação de uma projeção antiga é explícita, atómica, idempotente e apenas para contas vazias, preservando stock e histórico sem somar de novo as compras.
+
+A fotografia vive na Despensa. A interface permite câmara/ficheiro, compressão local, análise online e revisão persistente dos nomes, categorias, marca opcional e quantidade total em casa. Contagens de embalagens não viram kg/litros. O stock só muda após a confirmação obrigatória; uma contagem substitui o valor anterior e não produz despesas. Alterações concorrentes de stock são detetadas. Imagens não entram no IndexedDB, service worker ou base. A função exige sessão válida, origem permitida, imagem válida/tamanho limitado e quota persistente antes de chamar o fornecedor; a chave privada fica em secrets da função.
+
+Validação: 22 testes automatizados (11 de domínio, 5 PostgreSQL/RLS/RPC, 3 do handler de visão, 3 de autenticação). Chromium com perfil e PostgreSQL temporários cobre migração, checkout offline, interface totalmente sem rede, reinício do browser, rascunho de foto após reload, revisão obrigatória, sete larguras 320–1440px, resposta perdida depois da gravação, isolamento/renovação de sessão, falha de armazenamento e dois separadores; zero erros JavaScript. Captura de teste `shots/supabase-photo-mobile.png` revista visualmente. A estética Console e os seis destinos foram preservados; não se voltou a executar a skill Hallmark neste incremento funcional.
+
+Limite de validação: não foi criado nem configurado um projeto Supabase real nesta sessão e não foi chamada a API OpenAI. O reconhecimento nos testes usa respostas simuladas e não comprova precisão. O projeto, a migração remota, Auth e a Edge Function/secrets precisam de configuração por alguém com acesso. O README contém os passos; nenhum segredo foi colocado no front-end.

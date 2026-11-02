@@ -1,6 +1,8 @@
 import { LocalStore } from './store.mjs';
 import { statistics, quantity } from './model.mjs';
 import { Checkout } from './checkout.mjs';
+import { SupabaseCloud } from './cloud.mjs';
+import { Vision } from './vision.mjs';
 const $ = s => document.querySelector(s);
 const currency = new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' });
 const number = new Intl.NumberFormat('pt-PT', { maximumFractionDigits: 3 });
@@ -8,13 +10,14 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;'
 const money = value => currency.format(value);
 const date = value => new Intl.DateTimeFormat('pt-PT').format(new Date(`${value}T12:00:00`));
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
-let apiUrl = localStorage.getItem('foodstock-api') || 'http://localhost:8080';
+const cloud=new SupabaseCloud();
 let state = { products: [], purchases: [], stats: null, shopping: { templateImported: false, items: [] } };
 let localStore;
 let localView;
 let renderSequence=0;
 let lastRendered='';
 const checkout=new Checkout(()=>localStore,notify,()=>reloadLocal());
+const vision=new Vision(()=>localStore,cloud,notify,()=>reloadLocal());
 function notify(text, success = false) { $('#message').hidden=false;$('#message').textContent=text;$('#message').className=success?'success':''; }
 function table(headers, rows, empty) { return rows.length ? `<div class="table-wrap"><table><thead><tr>${headers.map(h=>`<th scope="col">${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map((c,i)=>`<td data-label="${esc(headers[i])}" class="${['Data','Mês','Gasto','Variação mensal','Disponível','Mínimo','Quantidade','Total','Preço / unidade','Último preço','Variação','Melhor compra registada'].includes(headers[i])&&/\d/.test(String(c))?'measured':''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` : `<p class="empty">${empty}</p>`; }
 function percent(value) { return value==null?'Sem base de comparação':`${value>0?'+':''}${number.format(value)}%`; }
@@ -24,6 +27,8 @@ async function reloadLocal(force=false) {
   const view=await localStore.view();if(seq!==renderSequence)return;
   localView=view;
   checkout.update(view);
+  vision.update(view);
+  renderCloud(view);
   const serial=JSON.stringify(view.data)+$('#year').value;
   if(force||serial!==lastRendered) {
    lastRendered=serial;
@@ -32,16 +37,16 @@ async function reloadLocal(force=false) {
   }
   const pending=view.profile.pending.length;
   const blocked=view.profile.pending.find(op=>op.error);
-  $('#connection').textContent=view.syncing?'A sincronizar. Guardado no navegador.':view.connected?(pending?`API ligada. ${pending} por enviar.`:'Tudo sincronizado.'):(pending?`Guardado aqui. ${pending} por enviar.`:'Guardado no navegador.');
-  $('#sync-summary').textContent=blocked?'Uma alteração precisa da tua atenção.':pending?`${pending} alteração(ões) aguardam envio automático.`:'Não há alterações locais pendentes.';
-  $('#sync-error').textContent=blocked?.error||view.warnings[0]?.message||view.profile.lastError||'';
-  $('#sync-last').innerHTML=view.profile.lastSynced?`Última ligação: <time class="measured">${esc(new Date(view.profile.lastSynced).toLocaleString('pt-PT'))}</time>.`:'Ainda não houve ligação à API. Podes começar a registar dados.';
+  $('#connection').textContent=view.syncing?'A sincronizar. Guardado no navegador.':view.connected?(pending?`Supabase ligado. ${pending} por enviar.`:'Tudo sincronizado com o Supabase.'):(pending?`Guardado aqui. ${pending} por enviar.`:'Guardado no navegador.');
+  $('#sync-summary').textContent=blocked?'Uma alteração precisa da tua atenção.':pending?(cloud.user?`${pending} alteração(ões) aguardam envio automático.`:`${pending} alteração(ões) guardadas apenas neste navegador. Podes migrá-las depois de iniciares sessão.`):'Não há alterações locais pendentes.';
+  $('#sync-error').textContent=blocked?.error||view.warnings[0]?.message||(cloud.user?view.profile.lastError:'')||'';
+  $('#sync-last').innerHTML=view.profile.lastSynced?`Última ligação: <time class="measured">${esc(new Date(view.profile.lastSynced).toLocaleString('pt-PT'))}</time>.`:'Ainda não houve ligação ao Supabase. Podes começar a registar dados offline.';
   $('#sync-pending').innerHTML=view.profile.pending.map(op=>`<li><div><strong>${esc(operationLabel(op))}</strong><p class="muted">${esc(op.error||'Guardada, à espera de envio.')}</p></div>${op.error||view.warnings.some(w=>w.id===op.operationId)?`<button class="secondary" type="button" data-discard="${esc(op.operationId)}">Descartar</button>`:''}</li>`).join('');
   $('#refresh').disabled=false;
  } catch(error) { notify('Não foi possível ler ou guardar dados neste navegador. '+error.message); }
 }
 function operationLabel(op) {
- return ({PRODUCT_CREATE:'Alimento: '+(op.data.name||''),PURCHASE_CREATE:'Compra: '+(op.data.store||''),CONSUME:'Saída de estoque',CHECKOUT:'Finalizar compras: '+(op.data.items?.length||0)+' item(ns)',SHOPPING_IMPORT:'Carregar lista de compras',SHOPPING_CHECK:'Marcação da lista',SHOPPING_DETAILS:'Quantidade e notas da lista'})[op.kind]||'Alteração pendente';
+ return ({PRODUCT_CREATE:'Alimento: '+(op.data.name||''),PURCHASE_CREATE:'Compra: '+(op.data.store||''),CONSUME:'Saída de estoque',INVENTORY_CAPTURE:'Contagem de inventário revista',CHECKOUT:'Finalizar compras: '+(op.data.items?.length||0)+' item(ns)',SHOPPING_IMPORT:'Carregar lista de compras',SHOPPING_CHECK:'Marcação da lista',SHOPPING_DETAILS:'Quantidade e notas da lista'})[op.kind]||'Alteração pendente';
 }
 async function refresh() { await localStore.sync();await reloadLocal(); }
 async function save(kind,entityId,data) { await localStore.enqueue(kind,entityId,data);await reloadLocal(); }
@@ -63,7 +68,7 @@ function render() {
 }
 function renderInventory() {
   const term=$('#search').value.toLocaleLowerCase('pt-PT');
-  $('#inventory').innerHTML=table(['Alimento','Disponível','Mínimo','Estado'],state.products.filter(p=>p.name.toLocaleLowerCase('pt-PT').includes(term)).map(p=>[esc(p.name),`${number.format(p.stock)} ${esc(p.unit)}`,`${number.format(p.minimumStock)} ${esc(p.unit)}`,`<span class="badge ${p.stock<=p.minimumStock?'warning':''}">${p.stock<=p.minimumStock?'Repor':'Em dia'}</span>`]),'Nenhum alimento encontrado. Adiciona o primeiro produto abaixo.');
+  $('#inventory').innerHTML=table(['Alimento','Disponível','Mínimo','Estado'],state.products.filter(p=>p.name.toLocaleLowerCase('pt-PT').includes(term)).map(p=>[`${esc(p.name)}${p.category?`<br><small>${esc(p.category)}</small>`:''}${p.brand?`<br><small>${esc(p.brand)}</small>`:''}`,`${number.format(p.stock)} ${esc(p.unit)}`,`${number.format(p.minimumStock)} ${esc(p.unit)}`,`<span class="badge ${p.stock<=p.minimumStock?'warning':''}">${p.stock<=p.minimumStock?'Repor':'Em dia'}</span>`]),'Nenhum alimento encontrado. Adiciona o primeiro produto abaixo.');
 }
 function renderShopping() {
   const focused=document.activeElement;
@@ -128,11 +133,48 @@ bindForm('#consume-form',async data=>{
  await save('CONSUME',data.productId,{quantity:Number(data.quantity),reason:data.reason});$('#consume-form').reset();notify('Saída guardada neste navegador.',true);
 });
 bindForm('#settings-form',async()=>{
- const url=new URL($('#api-url').value);
- const loopback=['localhost','127.0.0.1','[::1]'].includes(url.hostname);
- if((url.protocol!=='https:'&&!(loopback&&url.protocol==='http:'))||url.username||url.password||url.pathname!=='/'||url.search||url.hash)throw Error('Usa HTTPS para um endereço acessível ao telemóvel, ou HTTP com localhost no próprio computador.');
- apiUrl=url.origin;localStorage.setItem('foodstock-api',apiUrl);localStore?.close();startStore();
- notify('Endereço guardado. Os teus dados locais foram mantidos.',true);await reloadLocal(true);await refresh();
+ cloud.configure({url:$('#supabase-url').value,publishableKey:$('#supabase-key').value});
+ notify('Projeto guardado. Inicia sessão para sincronizar os teus dispositivos.',true);
+});
+$('#auth-form').addEventListener('submit',async event=>{
+ event.preventDefault();const form=event.target;if(form.dataset.busy)return;form.dataset.busy='true';
+ const buttons=[...form.querySelectorAll('button')];buttons.forEach(b=>b.disabled=true);
+ try{
+  const data=Object.fromEntries(new FormData(form));
+  if(event.submitter?.value==='signup'){
+   const signed=await cloud.signup(data.email.trim(),data.password);
+   notify(signed?'Conta criada. A sincronizar.':'Confirma o teu email e depois inicia sessão com a mesma conta no Mac e no telemóvel.',true);
+  }else{await cloud.login(data.email.trim(),data.password);notify('Sessão iniciada. A sincronizar os dados desta conta.',true);}
+  form.elements.password.value='';
+ }catch(error){notify(error.message);}finally{delete form.dataset.busy;buttons.forEach(b=>b.disabled=false);}
+});
+$('#signout').addEventListener('click',()=>cloud.logout().catch(e=>notify(e.message)));
+function renderCloud(view){
+ $('#cloud-config-note').textContent=cloud.config?'Projeto: '+cloud.config.url:'Ainda não há um projeto configurado. A aplicação funciona com dados locais até o ligares.';
+ $('#auth-form').hidden=Boolean(cloud.user);$('#account-details').hidden=!cloud.user;
+ $('#account-email').textContent=cloud.user?.email||'';
+ $('#migrate-local').hidden=!cloud.user;$('#import-file').disabled=!cloud.user;
+ $('#resume-import').hidden=!view.profile.importDraft;$('#cancel-import').hidden=!view.profile.importDraft;
+ $('#account-note').textContent=cloud.user?'Usa esta mesma conta no Mac e no telemóvel. Ao sair, a cópia desta conta fica separada dos dados locais sem sessão.':'Sem sessão: os dados ficam apenas neste navegador. Inicia sessão para sincronizar entre dispositivos.';
+}
+let importing=false;
+async function importToCloud(data){
+ if(importing)return;
+ if(data&&!confirm(`Importar ${data.products?.length||0} alimento(s) e ${data.purchases?.length||0} compra(s) para esta conta? Só é permitido numa conta vazia. A cópia original será preservada.`))return;
+ importing=true;
+ try{await localStore.importData(data);await reloadLocal(true);notify('Dados importados para o Supabase. A cópia original foi preservada.',true);}
+ finally{importing=false;await reloadLocal();}
+}
+$('#migrate-local').addEventListener('click',async()=>{try{await importToCloud(await localStore.legacy());}catch(e){notify(e.message);}});
+$('#resume-import').addEventListener('click',()=>importToCloud().catch(e=>notify(e.message)));
+$('#cancel-import').addEventListener('click',async()=>{if(importing)return;if(confirm('Cancelar apenas esta tentativa de importação? O ficheiro original e os dados já existentes na nuvem não são apagados.')){try{await localStore.cancelImport();}catch(e){notify(e.message);}}});
+$('#import-file').addEventListener('change',async event=>{
+ try{
+  const file=event.target.files?.[0];if(!file)return;if(file.size>15*1024*1024)throw Error('Escolhe um backup JSON até 15 MB.');
+  const backup=JSON.parse(await file.text()),data=backup.data||backup;
+  if(!Array.isArray(data.products)||!Array.isArray(data.purchases)||!Array.isArray(data.movements))throw Error('Este ficheiro não é um backup FoodStock válido.');
+  await importToCloud(data);
+ }catch(e){notify(e.message);}finally{event.target.value='';}
 });
 $('#export').addEventListener('click',async()=>{
  try {const data=await localStore.backup();const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download=`foodstock-${today()}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
@@ -143,7 +185,12 @@ $('#sync-pending').addEventListener('click',async event=>{
  const button=event.target.closest('button[data-discard]');if(!button)return;
  if(confirm('Descartar apenas esta alteração local? O registo não será enviado. Alterações posteriores que dependam dele podem precisar de ser resolvidas. Exporta uma cópia se quiseres guardar o conteúdo.'))await localStore.discard(button.dataset.discard);
 });
-function startStore(){localStore=new LocalStore(apiUrl);localStore.addEventListener('change',()=>reloadLocal());}
+function startStore(){
+ const priorKey=localStore?.key;localStore?.close();localStore=new LocalStore(cloud);lastRendered='';
+ if(priorKey&&priorKey!==localStore.key){for(const id of ['#product-form','#purchase-form','#consume-form'])$(id).reset();$('#purchase-form [name=purchasedOn]').value=today();$('#search').value='';}
+ localStore.addEventListener('change',()=>reloadLocal());
+}
+cloud.addEventListener('change',()=>{startStore();reloadLocal(true).then(refresh).catch(e=>notify(e.message));});
 function navigate() {
   if ($('#message').classList.contains('success')) $('#message').hidden = true;
   const ids=['overview','stock','shopping','purchases','prices','settings'];
@@ -157,7 +204,7 @@ $('#refresh').addEventListener('click',()=>{ $('#message').hidden=true;refresh()
 $('#year').value=new Date().getFullYear();
 $('#year').addEventListener('change',()=>{if($('#year').checkValidity())reloadLocal(true);});
 $('#search').addEventListener('input',renderInventory);
-$('#api-url').value=apiUrl;
+$('#supabase-url').value=cloud.config?.url||'';$('#supabase-key').value=cloud.config?.publishableKey||'';
 $('#purchase-form [name=purchasedOn]').value=today();$('#purchase-form [name=purchasedOn]').max=today();
 window.addEventListener('hashchange',navigate);navigate();startStore();await reloadLocal(true);refresh().catch(error=>notify(error.message));
 setInterval(()=>{if(!document.hidden)refresh().catch(()=>{});},15000);

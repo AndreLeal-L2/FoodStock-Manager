@@ -1,5 +1,5 @@
-const CACHE='foodstock-shell-v5';
-const ASSETS=['./','index.html','style.css','tokens.css','base.css','app.js','store.mjs','model.mjs','checkout.mjs','shopping-template.mjs','fonts/host-grotesk.ttf','fonts/atkinson-mono.ttf'];
+const CACHE='foodstock-shell-v6';
+const ASSETS=['./','index.html','style.css','tokens.css','base.css','app.js','store.mjs','model.mjs','checkout.mjs','cloud.mjs','config.mjs','vision.mjs','vision-model.mjs','shopping-template.mjs','fonts/host-grotesk.ttf','fonts/atkinson-mono.ttf'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS))));
 self.addEventListener('activate',event=>event.waitUntil(Promise.all([caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith('foodstock-shell-')&&key!==CACHE).map(key=>caches.delete(key)))),self.clients.claim()])));
 self.addEventListener('fetch',event=>{

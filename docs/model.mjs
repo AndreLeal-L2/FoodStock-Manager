@@ -7,7 +7,7 @@ function validateOperation(op) {
  const text=(value,max,required=false)=>{if(typeof value!=='string'||value.length>max||(required&&!value.trim()))throw Error('Preenche os campos de texto e respeita os limites indicados.');};
  const decimal=(value,places,positive=false)=>{if(typeof value!=='number'||!Number.isFinite(value)||value<0||(positive&&value===0)||value>=1000000000||Number(value.toFixed(places))!==value)throw Error(`Quantidade ou valor inválido. Usa até ${places} casas decimais.`);};
  switch(op.kind) {
-  case 'PRODUCT_CREATE':text(b.name,120,true);if(!['kg','L','un'].includes(b.unit))throw Error('Unidade inválida.');decimal(b.initialStock,3);decimal(b.minimumStock,3);break;
+  case 'PRODUCT_CREATE':text(b.name,120,true);if(!['kg','L','un'].includes(b.unit))throw Error('Unidade inválida.');decimal(b.initialStock,3);decimal(b.minimumStock,3);if(b.category!==undefined)text(b.category,80);if(b.brand!==undefined)text(b.brand,120);break;
   case 'PURCHASE_CREATE': {
    text(b.store,120,true);decimal(b.quantity,3,true);decimal(b.total,2,true);
    const d=new Date(b.purchasedOn+'T12:00:00Z'),now=new Date();
@@ -18,6 +18,14 @@ function validateOperation(op) {
   case 'CONSUME':decimal(b.quantity,3,true);text(b.reason,200,true);break;
   case 'SHOPPING_CHECK':if(typeof b.checked!=='boolean')throw Error('Marcação inválida.');break;
   case 'SHOPPING_DETAILS':text(b.quantityText,120);text(b.notes,250);text(b.expectedQuantityText,120);text(b.expectedNotes,250);break;
+  case 'INVENTORY_CAPTURE':
+   if(!Array.isArray(b.items)||!b.items.length||b.items.length>60)throw Error('Revê entre 1 e 60 alimentos.');
+   for(const line of b.items){
+    decimal(line.quantity,3);text(line.category,80);text(line.brand,120);
+    if(line.newProduct)validateOperation({kind:'PRODUCT_CREATE',data:{...line.newProduct,initialStock:line.quantity,minimumStock:0}});
+    else decimal(line.expectedStock,3);
+   }
+   break;
   case 'CHECKOUT':
    if(!Array.isArray(b.items)||!b.items.length||b.items.length>100)throw Error('Seleciona pelo menos um item para finalizar.');
    for(const line of b.items) {
@@ -55,7 +63,7 @@ export function applyOperation(data,op) {
  switch(op.kind) {
   case 'PRODUCT_CREATE': {
    if(data.products.some(p=>p.id===op.entityId))throw Error('Este alimento já existe.');
-   data.products.push({id:op.entityId,name:body.name.trim(),unit:body.unit,stock:Number(body.initialStock),minimumStock:Number(body.minimumStock)});
+   data.products.push({id:op.entityId,name:body.name.trim(),unit:body.unit,stock:Number(body.initialStock),minimumStock:Number(body.minimumStock),category:body.category||'',brand:body.brand||''});
    break;
   }
   case 'PURCHASE_CREATE': {
@@ -74,6 +82,19 @@ export function applyOperation(data,op) {
    break;
   case 'SHOPPING_CHECK': item().checked=body.checked;break;
   case 'SHOPPING_DETAILS': {const i=item();i.quantityText=body.quantityText.trim();i.notes=body.notes.trim();break;}
+  case 'INVENTORY_CAPTURE': {
+   const next=structuredClone(data),seen=new Set();
+   for(const line of body.items){
+    if(seen.has(line.productId))throw Error('Agrupa o mesmo alimento numa única linha.');seen.add(line.productId);
+    if(line.newProduct)applyOperation(next,{...op,kind:'PRODUCT_CREATE',entityId:line.productId,data:{...line.newProduct,initialStock:line.quantity,minimumStock:0}});
+    else{
+     const p=next.products.find(p=>p.id===line.productId);if(!p)throw Error('Alimento não encontrado.');
+     if(quantity(p.stock)!==quantity(line.expectedStock))throw Error('O stock mudou. Revê a contagem antes de substituir.');
+     p.stock=line.quantity;p.category=line.category;p.brand=line.brand;
+    }
+   }
+   Object.assign(data,next);break;
+  }
   case 'CHECKOUT': {
    const next=structuredClone(data),seen=new Set(),purchaseIds=new Set();
    for(const line of body.items) {

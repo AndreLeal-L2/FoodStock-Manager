@@ -1,0 +1,6 @@
+project_id = "foodstock-manager"
+
+[functions.recognize-food]
+# Validate the current user's token with Supabase Auth inside the function.
+# This also supports projects using the new publishable keys.
+verify_jwt = false
