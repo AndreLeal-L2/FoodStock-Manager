@@ -62,7 +62,7 @@ test('import preserves current stock and history exactly once, blocks overwrite 
  await assert.rejects(rpc('foodstock_import',[randomUUID(),data]),/já contém dados/);
  instance=oldInstance;await user(alice);
 });
-test('authenticated analysis quota is persistent and scoped per account',async()=>{
+test('historical quota RPC remains scoped; local vision does not invoke it',async()=>{
  for(let i=1;i<=10;i++)assert.equal((await rpc('foodstock_reserve_analysis',[])).used,i);
  await assert.rejects(rpc('foodstock_reserve_analysis',[]),/Limite diário/);
  await user(bob);assert.equal((await rpc('foodstock_reserve_analysis',[])).used,1);await user(alice);

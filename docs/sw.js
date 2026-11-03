@@ -1,6 +1,6 @@
-const VERSION='20261103.1';
+const VERSION='20261103.2';
 const CACHE='foodstock-shell-'+VERSION;
-const FILES=['./','index.html','style.css','tokens.css','base.css','boot.js','app.js','store.mjs','model.mjs','checkout.mjs','cloud.mjs','config.mjs','vision.mjs','vision-model.mjs','shopping-template.mjs','fonts/host-grotesk.ttf','fonts/atkinson-mono.ttf'];
+const FILES=['./','index.html','style.css','tokens.css','base.css','boot.js','app.js','store.mjs','model.mjs','checkout.mjs','cloud.mjs','config.mjs','vision.mjs','vision-model.mjs','vision-engine.mjs','vision-client.mjs','vision-worker.mjs','vision-catalog.mjs','visual-catalog-ui.mjs','shopping-template.mjs','fonts/host-grotesk.ttf','fonts/atkinson-mono.ttf'];
 const ASSETS=FILES.map(path=>/\.(?:css|js|mjs)$/.test(path)?path+'?v='+VERSION:path);
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS.map(asset=>new Request(new URL(asset,self.registration.scope),{cache:'reload'}))))));
 self.addEventListener('activate',event=>event.waitUntil(Promise.all([

@@ -1,17 +1,13 @@
-import {photoDraft,captureData,categories} from './vision-model.mjs?v=20261103.1';
+import {runVision,readImage} from './vision-client.mjs?v=20261103.2';
+import {detectionsToItems} from './vision-catalog.mjs?v=20261103.2';
+import {VisualCatalog} from './visual-catalog-ui.mjs?v=20261103.2';
+import {photoDraft,captureData,categories} from './vision-model.mjs?v=20261103.2';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-async function compress(file){
- if(!file.type.startsWith('image/')||file.size>20*1024*1024)throw Error('Escolhe uma imagem até 20 MB.');
- let bitmap;try{bitmap=await createImageBitmap(file,{imageOrientation:'from-image'});}catch{throw Error('Não consegui abrir esta imagem. Exporta-a como JPEG, PNG ou WebP e tenta novamente.');}
- try{
-  const ratio=Math.min(1,2048/Math.max(bitmap.width,bitmap.height)),canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(bitmap.width*ratio));canvas.height=Math.max(1,Math.round(bitmap.height*ratio));
-  const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);
-  const image=canvas.toDataURL('image/jpeg',0.85);if(image.length>3_800_000)throw Error('A imagem continua demasiado grande. Recorta-a ou fotografa menos itens de cada vez.');return image;
- }finally{bitmap.close();}
-}
 export class Vision {
- constructor(getStore,cloud,notify,reload){
-  Object.assign(this,{getStore,cloud,notify,reload,draft:null,busy:false,writes:Promise.resolve(),scope:null});
+ constructor(getStore,notify,reload){
+  Object.assign(this,{getStore,notify,reload,draft:null,busy:false,writes:Promise.resolve(),scope:null});
+  this.catalog=new VisualCatalog(getStore,notify,()=>this.busy);
+  document.querySelector('#photo-cancel').addEventListener('click',()=>this.abort?.abort());
   this.panel=document.querySelector('#photo-review');this.preview=document.querySelector('#photo-preview');
   for(const input of document.querySelectorAll('[data-photo-input]'))input.addEventListener('change',()=>this.choose(input.files?.[0]).catch(e=>notify(e.message)).finally(()=>{input.value='';}));
   document.querySelector('#photo-analyze').addEventListener('click',()=>this.analyze().catch(e=>notify(e.message)));
@@ -31,34 +27,41 @@ export class Vision {
   this.view=view;
   if(this.scope!==view.profile.key){this.reset();this.scope=view.profile.key;}
   if(!this.draft&&view.profile.photoDraft){this.draft=structuredClone(view.profile.photoDraft);this.render();}
-  document.querySelector('#photo-requirements').textContent=this.cloud.user?'Escolhe uma fotografia para analisar online. Os resultados só entram no stock depois da tua revisão.':'Para reconhecer alimentos, inicia sessão na tua conta FoodStock em Dados. Podes continuar a registar alimentos manualmente.';
+  this.catalog.update(view);
+  document.querySelector('#photo-requirements').textContent=this.catalog.references.length?'A análise corre neste dispositivo e procura as embalagens cadastradas. Os resultados só entram no stock depois da tua revisão.':'Começa por cadastrar uma foto da frente de cada embalagem nas Referências visuais. O programa só reconhece padrões cadastrados; podes também adicionar itens manualmente.';
  }
- reset(){clearTimeout(this.timer);this.abort?.abort();this.draft=null;this.image=null;this.busy=false;this.panel.innerHTML='';this.panel.hidden=true;this.preview.removeAttribute('src');this.preview.hidden=true;document.querySelector('#photo-analyze').disabled=true;document.querySelector('#photo-status').textContent='';}
+ reset(){this.generation=(this.generation||0)+1;clearTimeout(this.timer);this.abort?.abort();this.draft=null;this.image=null;this.busy=false;this.panel.innerHTML='';this.panel.hidden=true;this.preview.getContext('2d').clearRect(0,0,this.preview.width,this.preview.height);this.preview.hidden=true;document.querySelector('#photo-cancel').hidden=true;document.querySelector('#photo-analyze').disabled=true;document.querySelector('#photo-status').textContent='';}
  async choose(file){
-  if(!file||this.busy)return;
-  const store=this.getStore(),image=await compress(file);if(store!==this.getStore())return;this.image=image;this.preview.src=image;this.preview.hidden=false;document.querySelector('#photo-analyze').disabled=false;document.querySelector('#photo-status').textContent='Fotografia preparada. A análise envia esta imagem ao serviço de reconhecimento; não fica guardada na tua conta.';
+  if(!file||this.busy)return;const store=this.getStore(),generation=(this.generation||0)+1;this.generation=generation;this.image=null;this.preview.hidden=true;const button=document.querySelector('#photo-analyze');button.disabled=true;
+  const image=await readImage(file,1280);if(store!==this.getStore()||generation!==this.generation)return;this.image=image;this.preview.width=image.width;this.preview.height=image.height;this.preview.getContext('2d').drawImage(image,0,0);this.preview.hidden=false;button.disabled=false;document.querySelector('#photo-status').textContent='Fotografia preparada. Os píxeis são analisados apenas neste dispositivo.';
  }
+
  async analyze(){
-  if(this.busy||!this.image)return;
+  if(this.busy||this.catalog.saving||!this.image)return;
   if(this.scope!==this.getStore().key)throw Error('A conta mudou. Escolhe novamente a fotografia.');
-  if(!this.cloud.user)throw Error('Inicia sessão em Dados para reconhecer os alimentos.');
+  if(!this.catalog.references.length)throw Error('Cadastra primeiro uma foto de referência das embalagens que queres reconhecer.');
   if(this.draft&&!confirm('Substituir o rascunho de reconhecimento atual? O stock ainda não foi alterado.'))return;
-  this.busy=true;this.abort=new AbortController();const timeout=setTimeout(()=>this.abort.abort(),45000),button=document.querySelector('#photo-analyze'),store=this.getStore();button.disabled=true;
-  document.querySelector('#photo-status').textContent='A identificar os alimentos…';
+  this.busy=true;this.abort=new AbortController();const button=document.querySelector('#photo-analyze'),cancel=document.querySelector('#photo-cancel'),store=this.getStore(),references=structuredClone(this.catalog.references);button.disabled=true;cancel.hidden=false;
+  document.querySelector('#photo-status').textContent='A procurar correspondências visuais neste dispositivo…';
   try{
-   const reply=await this.cloud.recognize(this.image,this.abort.signal);if(store!==this.getStore())return;
-   const draft=photoDraft(reply.items,(await store.view()).data.products);await store.savePhotoDraft(draft);this.draft=draft;this.render();
-   document.querySelector('#photo-status').textContent=draft.items.length?`${draft.items.length} alimento(s) sugerido(s). Revê cada nome e a quantidade total que tens em casa.`:'Não foram identificados alimentos. Podes adicionar linhas manualmente ou tentar outra fotografia.';
+   const {detections}=await runVision('analyze',this.image.getContext('2d').getImageData(0,0,this.image.width,this.image.height),references,{signal:this.abort.signal,onProgress:({current,total})=>{if(store===this.getStore())document.querySelector('#photo-status').textContent=`A comparar embalagens: ${current} de ${total} referências.`;}});if(store!==this.getStore())return;
+   const draft=photoDraft(detectionsToItems(detections,references),(await store.view()).data.products);await store.savePhotoDraft(draft);this.draft=draft;this.render();this.drawDetections(detections,references);
+   document.querySelector('#photo-status').textContent=draft.items.length?`${detections.length} embalagem(ns) correspondente(s) a ${draft.items.length} alimento(s). Podem faltar itens: revê os nomes e a quantidade total em casa.`:'Não encontrei correspondências seguras. Usa uma foto mais próxima e de frente, cadastra novas referências ou adiciona os alimentos em falta manualmente.';
    this.panel.scrollIntoView({block:'start',behavior:'instant'});
-  }catch(error){document.querySelector('#photo-status').textContent='A análise não foi concluída. Nenhum stock foi alterado.';throw error;}
-  finally{clearTimeout(timeout);this.busy=false;button.disabled=!this.image;}
+  }catch(error){if(store!==this.getStore())return;document.querySelector('#photo-status').textContent=error.name==='AbortError'?'Análise cancelada. O stock não foi alterado.':'A análise não foi concluída. O stock não foi alterado.';if(error.name!=='AbortError')throw error;}
+  finally{if(store===this.getStore()){this.busy=false;button.disabled=!this.image;cancel.hidden=true;}}
  }
+ drawDetections(detections,references){
+  const ctx=this.preview.getContext('2d'),scale=this.image.width/Math.max(1,this.preview.getBoundingClientRect().width),size=Math.max(14,12*scale);ctx.drawImage(this.image,0,0);ctx.lineWidth=2*scale;ctx.font=`${size}px sans-serif`;
+  for(const detection of detections){const points=detection.polygon;ctx.strokeStyle='#76b3ff';ctx.beginPath();points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.closePath();ctx.stroke();const name=references.find(r=>r.id===detection.referenceId)?.name||'Embalagem',width=ctx.measureText(name).width+6*scale,x=Math.max(0,Math.min(this.image.width-width,points[0][0])),y=Math.max(size*1.4,points[0][1]);ctx.fillStyle='#0b111a';ctx.fillRect(x,y-size*1.4,width,size*1.4);ctx.fillStyle='#edf3fb';ctx.fillText(name,x+3*scale,y-size*.2);}
+ }
+
  render(){
   if(!this.draft)return;
   const products=this.view.data.products;
   this.panel.hidden=false;this.panel.innerHTML=`<h3>Rever os alimentos</h3><p class="hint">Uma foto não revela tudo. Confirma a quantidade total de cada alimento que tens em casa. Para um alimento existente, esta contagem substitui o stock anterior; não é uma compra e não cria gastos.</p>
    <form id="photo-review-form">${this.draft.items.map((line,index)=>`<fieldset class="checkout-line" data-photo-line="${index}"><legend>Alimento ${index+1}</legend>
-    ${line.visibleCount?`<p class="hint">Embalagens/peças visíveis sugeridas: ${esc(line.visibleCount)}. Confirma o peso ou volume se usares kg ou L.</p>`:''}${line.notes?`<p class="hint">${esc(line.notes)}</p>`:''}
+    ${line.visibleCount?`<p class="hint">Embalagens com correspondência visual: ${esc(line.visibleCount)}. Confirma o peso ou volume se usares kg ou L.</p>`:''}${line.notes?`<p class="hint">${esc(line.notes)}</p>`:''}
     <label>Alimento na despensa<select name="productId"><option value="">Criar novo alimento</option>${products.map(p=>`<option value="${esc(p.id)}" ${p.id===line.productId?'selected':''}>${esc(p.name)} (${esc(p.unit)})</option>`).join('')}</select></label>
     <label>Nome<input name="name" maxlength="120" required value="${esc(line.name)}" ${line.productId?'disabled':''}></label>
     <div class="form-row"><label>Categoria<select name="category">${categories.map(c=>`<option ${line.category===c?'selected':''}>${esc(c)}</option>`).join('')}</select></label><label>Marca (opcional)<input name="brand" maxlength="120" value="${esc(line.brand)}"></label></div>

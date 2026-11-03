@@ -1,8 +1,8 @@
-import { LocalStore } from './store.mjs?v=20261103.1';
-import { statistics, quantity } from './model.mjs?v=20261103.1';
-import { Checkout } from './checkout.mjs?v=20261103.1';
-import { SupabaseCloud } from './cloud.mjs?v=20261103.1';
-import { Vision } from './vision.mjs?v=20261103.1';
+import { LocalStore } from './store.mjs?v=20261103.2';
+import { statistics, quantity } from './model.mjs?v=20261103.2';
+import { Checkout } from './checkout.mjs?v=20261103.2';
+import { SupabaseCloud } from './cloud.mjs?v=20261103.2';
+import { Vision } from './vision.mjs?v=20261103.2';
 const $ = s => document.querySelector(s);
 const currency = new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' });
 const number = new Intl.NumberFormat('pt-PT', { maximumFractionDigits: 3 });
@@ -17,7 +17,7 @@ let localView;
 let renderSequence=0;
 let lastRendered='';
 const checkout=new Checkout(()=>localStore,notify,()=>reloadLocal());
-const vision=new Vision(()=>localStore,cloud,notify,()=>reloadLocal());
+const vision=new Vision(()=>localStore,notify,()=>reloadLocal());
 function notify(text, success = false) { $('#message').hidden=false;$('#message').textContent=text;$('#message').className=success?'success':''; }
 function table(headers, rows, empty) { return rows.length ? `<div class="table-wrap"><table><thead><tr>${headers.map(h=>`<th scope="col">${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map((c,i)=>`<td data-label="${esc(headers[i])}" class="${['Data','Mês','Gasto','Variação mensal','Disponível','Mínimo','Quantidade','Total','Preço / unidade','Último preço','Variação','Melhor compra registada'].includes(headers[i])&&/\d/.test(String(c))?'measured':''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` : `<p class="empty">${empty}</p>`; }
 function percent(value) { return value==null?'Sem base de comparação':`${value>0?'+':''}${number.format(value)}%`; }

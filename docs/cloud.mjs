@@ -1,4 +1,4 @@
-import defaults from './config.mjs?v=20261103.1';
+import defaults from './config.mjs?v=20261103.2';
 export class CloudError extends Error {constructor(message,status){super(message);this.status=status;}}
 export function validateConfig(value){
  const url=new URL(value.url);
@@ -63,5 +63,4 @@ export class SupabaseCloud extends EventTarget {
   if(path==='snapshot')return this.rpc('foodstock_snapshot',{p_expected_instance_id:body.expectedInstanceId,p_pending_ids:body.pendingIds},signal);
   return this.rpc('foodstock_apply',{p_operation:body},signal);
  }
- async recognize(image,signal){return this.authorized('/functions/v1/recognize-food',{image},signal);}
 }

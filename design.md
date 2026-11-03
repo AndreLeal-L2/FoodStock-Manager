@@ -51,3 +51,8 @@ Shared system for six application views. The user explicitly replaced the previo
 The six navigation destinations and blue/grey palette remain. The deployment defines the Supabase project. Dados contains the FoodStock account controls and explicit legacy migration, with no provider URL/key form. Photo capture and recognition review live in Despensa, using the existing form surface. Recognition has distinct prepared, analysing, review, saved and error states. Counts describe total inventory rather than purchases; no recognition result changes stock until the user reviews and confirms it. IndexedDB profiles are isolated per project/account; photos are transient and are not cached by the service worker.
 
 The initial loader uses a revisioned module graph and offers interface-only recovery on startup failure; recovery preserves IndexedDB, session storage and the outbox.
+
+
+## Local classical vision
+
+Photo recognition uses an on-device worker and registered visual references. The capture panel offers a collapsible reference catalogue, optional touch/mouse crop, local progress/cancel controls, overlaid geometric matches and mandatory inventory review. References and thumbnails stay in the account-scoped browser profile, with explicit JSON export/import. There are no provider credentials, AI calls or generic semantic identification. Existing blue/grey tokens and six destinations remain.

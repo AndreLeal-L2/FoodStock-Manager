@@ -4,7 +4,7 @@ Despensa, lista de compras, gastos e preços. Front-end estático no **GitHub Pa
 
 Site: **https://andreleal-l2.github.io/FoodStock-Manager/**
 
-A aplicação funciona offline com IndexedDB e uma fila persistente. O projeto Supabase do FoodStock já está definido em `docs/config.mjs`, com o URL e a chave pública fornecidos pelo responsável. A aplicação mostra apenas a conta FoodStock (email/palavra-passe); não pede configuração do fornecedor aos utilizadores. Credenciais administrativas e chaves de IA ficam fora do site. A identificação por fotografia está implementada como integração opcional; requer uma Edge Function e um fornecedor de visão configurados. Os testes de visão usam respostas simuladas, não demonstram precisão de reconhecimento real.
+A aplicação funciona offline com IndexedDB e uma fila persistente. O projeto Supabase do FoodStock já está definido em `docs/config.mjs`, com o URL e a chave pública fornecidos pelo responsável. A aplicação mostra apenas a conta FoodStock (email/palavra-passe); não pede configuração do fornecedor aos utilizadores. Credenciais administrativas ficam fora do site. A identificação por fotografia usa agora um motor próprio de visão computacional clássica, executado no navegador: não usa OpenAI, modelos de IA, Edge Functions de visão ou APIs de reconhecimento pagas.
 
 ## Administração do Supabase
 
@@ -42,43 +42,44 @@ A autenticação e a aplicação da migração precisam de ser feitas por algué
 
 A cópia anterior deste navegador mantém-se separada, na chave `primary` do IndexedDB. Terminar sessão volta a essa cópia; não mistura dados entre contas. Os rascunhos anteriores mantêm-se nessa cópia original: conclui-os antes da migração ou retoma-os aí. Cada conta/projeto usa um perfil local separado. Os ficheiros H2 antigos continuam intactos; a aplicação nova não os lê diretamente. As instruções para exportar a API antiga estão em [backend/README.md](backend/README.md).
 
-## Fotografia da despensa
+## Fotografia da despensa: visão clássica local
 
-Em **Despensa → Identificar alimentos por fotografia**:
+O programa compara imagens com um catálogo de **embalagens cadastradas**. Não interpreta alimentos desconhecidos como um modelo de IA. O nome, a categoria, a unidade e a marca opcional são fornecidos por ti ao cadastrar a referência.
 
-1. Tira uma foto ou escolhe uma imagem. Usa boa luz e mantém as embalagens separadas e os rótulos visíveis. JPEG, PNG e WebP são suportados; se o navegador não conseguir abrir HEIC, converte-o para JPEG.
-2. Toca em **Analisar fotografia**. Requer sessão e Internet. A imagem é redimensionada no navegador para até 2048 px e convertida para JPEG antes do envio; os metadados originais não são copiados.
-3. Revê os nomes, categorias, marca opcional e quantidades. A contagem de embalagens visíveis é apenas uma sugestão, nunca é tratada automaticamente como kg ou litros. Pesos e volumes desconhecidos ficam por preencher.
-4. Associa cada linha a um alimento existente ou cria um novo. Remove falsos positivos e adiciona itens em falta.
-5. Confirma a **quantidade total que tens em casa**, na unidade do alimento. Para um alimento existente, o valor **substitui** o stock anterior. Uma foto não é uma compra: não cria gastos nem inventa preços. Se queres registar compras e preços, usa **Finalizar compras** ou **Compras**.
-6. Marca a confirmação de revisão e guarda. A contagem é gravada primeiro no navegador, mesmo sem rede. Se outro dispositivo tiver alterado o stock entretanto, a sincronização bloqueia a contagem e preserva-a para resolução, em vez de sobrescrever a alteração silenciosamente.
+### Cadastrar referências
 
-A foto não é guardada no banco nem num bucket. É enviada à Edge Function e ao fornecedor de visão apenas ao pedir a análise. A política de tratamento/retenção do fornecedor também se aplica. O rascunho com os resultados e as correções fica no navegador; depois de recarregar, podes continuar a revisão offline. A imagem em si não persiste.
+1. Em **Despensa → Referências visuais**, associa um alimento existente ou preenche os dados de uma nova referência. Cadastrar uma referência não cria stock, compras ou gastos.
+2. Escolhe uma foto nítida da frente da embalagem. Cadastra uma embalagem de cada vez e evita reflexos, dobras e objetos à frente.
+3. Podes arrastar sobre a foto para selecionar apenas a frente; **Usar imagem completa** mantém toda a foto como referência. Recorta uma área com pelo menos 64 × 64 píxeis, contendo texto/desenhos.
+4. Guarda a referência. Imagens uniformes ou com poucos pontos distinguíveis são rejeitadas. Podes cadastrar mais de uma vista da mesma embalagem, até 24 referências neste navegador/conta.
+5. O catálogo (metadados, padrões visuais e miniaturas) fica no IndexedDB, separado por conta. Para o usar no Mac, no telemóvel ou noutra conta, usa **Exportar referências** e **Importar referências JSON**. A importação não altera o stock. Não há envio automático de fotos ou referências para a base.
 
-### Ativar o reconhecimento com OpenAI
+### Identificar uma fotografia
 
-Esta implementação usa uma **Supabase Edge Function**, porque a chave do fornecedor não pode estar no GitHub Pages. O Supabase/PostgreSQL guarda os dados; o serviço de visão reconhece a imagem. Não é necessário manter um servidor teu ligado.
+1. Escolhe uma imagem ou tira uma foto em **Identificar alimentos por fotografia**. JPEG, PNG e WebP são suportados; se o navegador não abrir HEIC, converte-o para JPEG.
+2. Toca em **Analisar neste dispositivo**. Funciona sem sessão e sem Internet depois do primeiro acesso, incluindo os ficheiros do worker em cache. Não há pedidos a fornecedores de visão, chaves de IA ou custo por chamada de reconhecimento.
+3. O motor compara os detalhes visuais cadastrados, verifica a geometria e marca as correspondências na foto. O processamento corre num Web Worker para manter a interface utilizável; podes cancelar a análise.
+4. Revê os nomes, categorias e quantidades. A contagem indica apenas as embalagens com correspondência encontrada: pode haver objetos ocultos ou não identificados. Nunca é convertida automaticamente em kg/litros. Remove erros e adiciona os itens em falta manualmente.
+5. Confirma a **quantidade total que tens em casa**, na unidade do alimento. Para alimentos existentes, o valor substitui o stock anterior. Uma contagem não é uma compra, não inventa preços e não cria gastos. Usa Compras/Finalizar compras para registar despesas.
+6. Marca a revisão e guarda. O rascunho e a contagem são persistidos no navegador; o stock confirmado sincroniza com a tua conta quando houver rede. Conflitos com alterações feitas noutro dispositivo mantêm-se para resolução.
 
-1. Configura uma chave da API OpenAI com acesso a um modelo que suporte imagens e JSON Schema. O padrão é `gpt-4.1-mini`, substituível por `OPENAI_VISION_MODEL`.
-2. Na pasta do repositório, com a CLI autenticada e o projeto ligado:
+A fotografia da despensa e os metadados originais não são guardados nem enviados. As miniaturas das referências são geradas por canvas e ficam localmente com o catálogo; o backup do navegador inclui esse catálogo no perfil. O export específico de referências permite transportá-lo entre dispositivos. Limpar os dados do site remove as referências locais, por isso exporta-as antes.
+
+### Como funciona e quais são os limites
+
+O código próprio em [docs/vision-engine.mjs](docs/vision-engine.mjs) implementa pontos FAST, orientação pelo centroide de intensidade, descritores binários rotacionados, distância de Hamming e verificação geométrica RANSAC/homografia. Não contém pesos treinados, redes neuronais, OCR, dependências de visão externas nem chamadas de rede. São implementações de técnicas clássicas conhecidas, não algoritmos científicos inventados para este projeto.
+
+O reconhecimento é adequado sobretudo a frentes de embalagens com letras/logótipos/desenhos distintos. Embalagens novas precisam de uma referência; trocar a embalagem, esconder o rótulo, reflexos, desfocagem ou perspetivas fortes podem impedir a correspondência. Fruta solta e embalagens lisas/visualmente iguais não são identificadas de forma genérica. Referências de identidades diferentes que tenham correspondências muito semelhantes na mesma região são rejeitadas como ambíguas. O programa não deduz massa, conteúdo restante, marcas ilegíveis ou itens ocultos. A revisão humana continua obrigatória.
+
+Os testes incluem uma referência fotografada noutro ângulo, luminosidade alterada, cópias separadas, imagens desconhecidas e padrões ambíguos. O teste do navegador executa o worker real com rótulos sintéticos cadastrados, inteiramente offline. Isto demonstra os mecanismos de correspondência, não uma precisão garantida para todas as despensas. Nenhuma fotografia pessoal foi usada como fixture.
+
+A antiga integração de visão paga foi removida do código e da aplicação. O esquema SQL histórico pode conter uma tabela/função de quota antiga, que esta versão não utiliza; **não é preciso voltar a executar a migração** para ativar a visão local. Se chegaste a publicar a função antiga no teu projeto, podes removê-la com a CLI autenticada:
 
 ```sh
-supabase functions deploy recognize-food
+supabase functions delete recognize-food
 ```
 
-3. No Dashboard, em **Edge Functions → Secrets**, define:
-
-| Secret | Valor |
-| --- | --- |
-| `OPENAI_API_KEY` | A chave privada da OpenAI |
-| `ALLOWED_ORIGINS` | `https://andreleal-l2.github.io` (sem o caminho do repositório) |
-| `OPENAI_VISION_MODEL` | Opcional; padrão `gpt-4.1-mini` |
-
-`SUPABASE_URL` e `SUPABASE_ANON_KEY` são disponibilizados automaticamente pelo runtime Supabase. A função não precisa de `service_role`. O `verify_jwt = false` em `supabase/config.toml` é intencional para suportar as novas publishable keys: **a função verifica o Bearer token com Supabase Auth antes de analisar ou gastar quota**.
-
-Há um limite persistente de **10 tentativas de análise por conta/dia** na base; pedidos que chegam ao fornecedor contam mesmo se falharem. Configura também limites de orçamento no fornecedor. A imagem tem limite de envio, a resposta é validada e erros não devolvem chaves nem conteúdo bruto do fornecedor. A qualidade depende da fotografia/modelo: objetos sobrepostos, rótulos ilegíveis e embalagens abertas precisam de revisão humana. Marcas ilegíveis ficam vazias.
-
-Para desenvolvimento local, acrescenta o teu `http://localhost:PORTA` a `ALLOWED_ORIGINS`, separado por vírgula. Não precisas de o permitir para usar o site publicado.
+A aplicação atual nunca a chama. Não é necessário configurar funções de visão nem secrets de fornecedores.
 
 ## Compras, estatísticas e modo offline
 
@@ -110,7 +111,7 @@ FOODSTOCK_BROWSER=/usr/bin/chromium npm run test:browser
 
 No macOS, `FOODSTOCK_BROWSER` pode apontar para `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`.
 
-Os testes executam o modelo offline, a migração/RPCs/RLS em PostgreSQL local via PGlite e o handler de reconhecimento com fornecedor simulado. O teste Chromium usa um perfil e uma base temporários: verifica migração, autenticação, renovação de sessão, isolamento entre contas, fila/reinício/reenvio, confirmação de compras, revisão de fotografia e sete larguras de ecrã. Não usa fotos pessoais, não chama o fornecedor de IA e não demonstra precisão de visão nem substitui uma verificação final num projeto Supabase real.
+Os testes executam o modelo offline, a migração/RPCs/RLS em PostgreSQL local via PGlite e o motor de visão local com fotografias públicas de teste e imagens sintéticas. O teste Chromium usa um perfil e uma base temporários: verifica migração, autenticação, renovação de sessão, isolamento entre contas, fila/reinício/reenvio, confirmação de compras, revisão de fotografia e sete larguras de ecrã. Não usa fotos pessoais ou fornecedores de IA; não garante precisão para imagens arbitrárias nem substitui uma verificação final num projeto Supabase real.
 
 O GitHub Actions executa os testes e checks; o workflow Pages publica exclusivamente `docs/`. `backend/` permanece apenas para migração/exportação da versão antiga, fora da aplicação ativa.
 

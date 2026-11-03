@@ -4,11 +4,12 @@
   "scripts": {
     "test": "node tests/model.test.mjs && node tests/supabase.test.mjs && node tests/vision.test.mjs && node tests/auth.test.mjs",
     "test:browser": "node tests/offline-browser.cjs && node tests/upgrade-browser.cjs",
-    "check": "node --check docs/app.js && node --check docs/store.mjs && node --check docs/model.mjs && node --check docs/cloud.mjs && node --check docs/checkout.mjs && node --check docs/vision.mjs && node --check docs/vision-model.mjs && node --check docs/sw.js && node --check docs/boot.js",
+    "check": "node --check docs/app.js && node --check docs/store.mjs && node --check docs/model.mjs && node --check docs/cloud.mjs && node --check docs/checkout.mjs && node --check docs/vision.mjs && node --check docs/vision-model.mjs && node --check docs/sw.js && node --check docs/boot.js && node --check docs/vision-engine.mjs && node --check docs/vision-client.mjs && node --check docs/vision-worker.mjs && node --check docs/vision-catalog.mjs && node --check docs/visual-catalog-ui.mjs",
     "release:client": "node scripts/release-client.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.3.14",
-    "playwright": "1.56.1"
+    "playwright": "1.56.1",
+    "pngjs": "7.0.0"
   }
 }
