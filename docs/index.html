@@ -7,8 +7,8 @@
   <meta name="description" content="Organiza os alimentos de casa, regista as compras e compara gastos e preços por unidade com dados privados sincronizados entre os teus dispositivos.">
   <title>FoodStock · A tua despensa, em dia</title>
   <link rel="preload" href="fonts/host-grotesk.ttf" as="font" type="font/ttf" crossorigin>
-  <link rel="stylesheet" href="style.css">
-  <script type="module" src="app.js"></script>
+  <link rel="stylesheet" href="style.css?v=20261103.1">
+  <script src="boot.js?v=20261103.1" defer></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -22,15 +22,16 @@
         <a href="#shopping" data-title="Lista de compras" title="Lista de compras"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h12M9 12h12M9 19h12M3 5l1 1 2-2M3 12l1 1 2-2M3 19l1 1 2-2"/></svg><span>Lista</span></a>
         <a href="#purchases" data-title="Compras" title="Compras"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12l2 14H4L6 7zM9 7V5a3 3 0 0 1 6 0v2"/></svg><span>Compras</span></a>
         <a href="#prices" data-title="Preços e lojas" title="Preços e lojas"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3v17h17M8 15l4-5 4 2 4-7"/></svg><span>Preços</span></a>
-        <a href="#settings" data-title="Ligação e dados" title="Ligação e dados"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18M3 17h18M8 4v6m8 4v6"/></svg><span>Dados</span></a>
+        <a href="#settings" data-title="Conta e dados" title="Conta e dados"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18M3 17h18M8 4v6m8 4v6"/></svg><span>Dados</span></a>
       </nav>
     </details>
-    <div class="local-note"><p>Guardado neste navegador.</p><p>Com sessão iniciada, as alterações sincronizam com o Supabase quando houver Internet.</p></div>
+    <div class="local-note"><p>Guardado neste navegador.</p><p>Com sessão iniciada, as alterações sincronizam entre os teus dispositivos quando houver Internet.</p></div>
   </aside>
   <main>
     <header><h1 id="page-title">Visão geral</h1><button id="refresh" class="secondary" type="button">Sincronizar</button></header>
     <div class="status-line"><p id="connection" role="status">A abrir os dados deste navegador…</p><a class="sync-link" href="#settings">Ver sincronização</a></div>
     <p id="message" role="alert" hidden></p>
+    <button id="recover-interface" class="secondary" type="button" hidden>Recarregar interface</button>
     <noscript><p class="empty">Ativa o JavaScript para consultar os dados e usar os formulários. Os dados são guardados neste navegador.</p></noscript>
     <section id="overview" class="view">
       <div class="section-heading overview-heading"><h2>O teu ano em números</h2><label>Ano <input id="year" type="number" min="2000" max="2100" aria-label="Ano das estatísticas"></label></div>
@@ -78,9 +79,7 @@
     </section>
     <section id="prices" class="view" hidden><article class="prices-panel"><h2>Quanto custa, de verdade?</h2><p class="muted">Preço por unidade: a última compra comparada com a anterior. Melhores preços de todo o histórico, independentemente do ano selecionado.</p><p class="hint">Uma descida é uma oportunidade observada, não uma previsão de preços atuais. Compara o mesmo produto e a mesma qualidade.</p><div id="price-list"></div></article></section>
     <section id="settings" class="view" hidden>
-      <div class="settings-grid"><article class="settings-connection"><h2>Sincronizar com Supabase</h2><p>A tua despensa pode acompanhar-te no Mac e no telemóvel, sem manter um computador ligado. Os dados continuam disponíveis offline.</p><p id="cloud-config-note" class="hint"></p>
-       <details><summary>Configurar o projeto</summary><form id="settings-form"><label>URL do projeto Supabase<input id="supabase-url" type="url" required placeholder="https://teu-projeto.supabase.co"></label><label>Chave pública publishable/anon<input id="supabase-key" type="text" required autocomplete="off" spellcheck="false" placeholder="sb_publishable_…"></label><p class="hint">Usa apenas a chave pública. A chave service_role, palavras-passe da base e chaves de IA ficam fora do site. O projeto precisa das migrações incluídas no repositório.</p><button>Guardar projeto</button></form></details>
-       <h3>A tua conta</h3><p id="account-note" class="hint"></p><form id="auth-form"><label>Email<input name="email" type="email" autocomplete="username" required></label><label>Palavra-passe<input name="password" type="password" minlength="8" maxlength="128" autocomplete="current-password" required></label><div class="checkout-actions"><button type="submit" value="login">Iniciar sessão</button><button type="submit" value="signup" class="secondary">Criar conta</button></div></form>
+      <div class="settings-grid"><article class="settings-connection"><h2>A tua conta FoodStock</h2><p>A tua despensa acompanha-te no Mac e no telemóvel. Entra com o email e a palavra-passe da tua conta FoodStock.</p><p id="account-note" class="hint"></p><form id="auth-form"><label>Email<input name="email" type="email" autocomplete="username" required></label><label>Palavra-passe<input name="password" type="password" minlength="8" maxlength="128" autocomplete="current-password" required></label><div class="checkout-actions"><button type="submit" value="login">Iniciar sessão</button><button type="submit" value="signup" class="secondary">Criar conta</button></div></form>
        <div id="account-details" hidden><p>Sessão: <strong id="account-email"></strong></p><button id="signout" type="button" class="secondary">Terminar sessão neste navegador</button></div>
       </article><article class="settings-data"><h2>Os teus dados</h2><p>Moeda: EUR (€). O backup inclui alimentos, compras, lista, rascunhos e alterações ainda por enviar. Não inclui credenciais da tua conta.</p><button id="export" class="secondary" type="button">Exportar dados JSON</button>
        <h3>Migrar os dados anteriores</h3><p class="hint">Depois de iniciares sessão numa conta vazia, podes copiar os dados que já tinhas neste navegador ou importar um backup FoodStock. O stock atual é preservado e as compras antigas não voltam a somar quantidades. A cópia original permanece guardada.</p>

@@ -1,4 +1,4 @@
-import defaults from './config.mjs';
+import defaults from './config.mjs?v=20261103.1';
 export class CloudError extends Error {constructor(message,status){super(message);this.status=status;}}
 export function validateConfig(value){
  const url=new URL(value.url);
@@ -10,22 +10,26 @@ export function validateConfig(value){
  return {url:url.origin,publishableKey:key};
 }
 export class SupabaseCloud extends EventTarget {
- constructor(){
+ constructor(project=defaults){
   super();this.refreshing=null;this.epoch=0;
-  try{this.config=validateConfig(JSON.parse(localStorage.getItem('foodstock-cloud-config')||'null')||defaults);}catch{this.config=null;}
+  try{this.config=validateConfig(project);}catch{this.config=null;}
   this.session=this.readSession();
   window.addEventListener('storage',e=>{if(e.key===this.sessionKey()){this.session=this.readSession();this.epoch++;this.dispatchEvent(new Event('change'));}});
  }
  sessionKey(){return 'foodstock-session:'+this.config?.url;}
  readSession(){try{return JSON.parse(localStorage.getItem(this.sessionKey())||'null');}catch{return null;}}
- configure(value){this.config=validateConfig(value);localStorage.setItem('foodstock-cloud-config',JSON.stringify(this.config));this.session=this.readSession();this.epoch++;this.dispatchEvent(new Event('change'));}
  get user(){return this.session?.user||null;}
  get profileKey(){return this.user?`supabase:${this.config.url}:${this.user.id}`:'primary';}
  async json(path,body,{token,method='POST',signal}={}){
-  if(!this.config)throw new CloudError('Configura o projeto Supabase em Dados para sincronizar.',0);
+  if(!this.config)throw new CloudError('A ligação do FoodStock não está disponível. Tenta novamente mais tarde.',0);
   const response=await fetch(this.config.url+path,{method,credentials:'omit',headers:{apikey:this.config.publishableKey,'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},...(body===undefined?{}:{body:JSON.stringify(body)}),signal:signal||AbortSignal.timeout(15000)});
   let data;try{data=await response.json();}catch{}
-  if(!response.ok)throw new CloudError(response.status===401?'Sessão expirada. Inicia sessão novamente em Dados.':data?.message||data?.msg||data?.error_description||data?.error||`O Supabase respondeu ${response.status}.`,response.status);
+  if(!response.ok){
+   if(data?.code==='invalid_credentials')throw new CloudError('Email ou palavra-passe incorretos.',response.status);
+   if(data?.code==='email_not_confirmed')throw new CloudError('Confirma o teu email antes de iniciar sessão.',response.status);
+   if(response.status===429)throw new CloudError('Demasiadas tentativas. Aguarda um pouco e tenta novamente.',429);
+   throw new CloudError(response.status===401?'Sessão expirada. Inicia sessão novamente em Dados.':data?.message||data?.msg||data?.error_description||data?.error||`Não foi possível concluir o pedido (${response.status}).`,response.status);
+  }
   return data;
  }
  async login(email,password){

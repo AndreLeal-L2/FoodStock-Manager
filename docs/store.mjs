@@ -1,4 +1,4 @@
-import { emptyData,project } from './model.mjs';
+import { emptyData,project } from './model.mjs?v=20261103.1';
 const DB_NAME='foodstock-offline-v1';
 const newProfile=key=>({key,instanceId:null,base:emptyData(),pending:[],lastSynced:null,lastError:null});
 let opening;
@@ -74,7 +74,7 @@ export class LocalStore extends EventTarget {
      try {await this.request('operations',{...op,createdAt:undefined,error:undefined,instanceId:current.instanceId});}
      catch(error) {
       const unsupported=error.status===400&&error.message.startsWith('Tipo de alteração desconhecido');
-      if(unsupported)error.message='O esquema do Supabase precisa de ser atualizado para sincronizar esta alteração. Os dados continuam no navegador.';
+      if(unsupported)error.message='O servidor precisa de ser atualizado para sincronizar esta alteração. Os dados continuam no navegador.';
       if(error.status>=400&&error.status<500&&![401,403,408,429].includes(error.status)&&!unsupported){await access(this.key,p=>{const entry=p.pending.find(v=>v.operationId===op.operationId);if(entry)entry.error=error.message;return p;});}
       throw error;
      }
@@ -83,7 +83,7 @@ export class LocalStore extends EventTarget {
     }
    } catch(error) {
     if(this.closed)return;
-    this.connected=false;await access(this.key,p=>{p.lastError=error.status?error.message:'Sem ligação ao Supabase. As alterações continuam guardadas neste navegador.';return p;});
+    this.connected=false;await access(this.key,p=>{p.lastError=error.status?error.message:'Sem ligação à tua conta. As alterações continuam guardadas neste navegador.';return p;});
    } finally {this.running=false;this.changed();}
   };
   if(navigator.locks) {

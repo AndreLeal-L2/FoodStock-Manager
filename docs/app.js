@@ -1,8 +1,8 @@
-import { LocalStore } from './store.mjs';
-import { statistics, quantity } from './model.mjs';
-import { Checkout } from './checkout.mjs';
-import { SupabaseCloud } from './cloud.mjs';
-import { Vision } from './vision.mjs';
+import { LocalStore } from './store.mjs?v=20261103.1';
+import { statistics, quantity } from './model.mjs?v=20261103.1';
+import { Checkout } from './checkout.mjs?v=20261103.1';
+import { SupabaseCloud } from './cloud.mjs?v=20261103.1';
+import { Vision } from './vision.mjs?v=20261103.1';
 const $ = s => document.querySelector(s);
 const currency = new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' });
 const number = new Intl.NumberFormat('pt-PT', { maximumFractionDigits: 3 });
@@ -37,13 +37,13 @@ async function reloadLocal(force=false) {
   }
   const pending=view.profile.pending.length;
   const blocked=view.profile.pending.find(op=>op.error);
-  $('#connection').textContent=view.syncing?'A sincronizar. Guardado no navegador.':view.connected?(pending?`Supabase ligado. ${pending} por enviar.`:'Tudo sincronizado com o Supabase.'):(pending?`Guardado aqui. ${pending} por enviar.`:'Guardado no navegador.');
+  $('#connection').textContent=view.syncing?'A sincronizar. Guardado no navegador.':view.connected?(pending?`Ligação ativa. ${pending} por enviar.`:'Tudo sincronizado.'):(pending?`Guardado aqui. ${pending} por enviar.`:'Guardado no navegador.');
   $('#sync-summary').textContent=blocked?'Uma alteração precisa da tua atenção.':pending?(cloud.user?`${pending} alteração(ões) aguardam envio automático.`:`${pending} alteração(ões) guardadas apenas neste navegador. Podes migrá-las depois de iniciares sessão.`):'Não há alterações locais pendentes.';
   $('#sync-error').textContent=blocked?.error||view.warnings[0]?.message||(cloud.user?view.profile.lastError:'')||'';
-  $('#sync-last').innerHTML=view.profile.lastSynced?`Última ligação: <time class="measured">${esc(new Date(view.profile.lastSynced).toLocaleString('pt-PT'))}</time>.`:'Ainda não houve ligação ao Supabase. Podes começar a registar dados offline.';
+  $('#sync-last').innerHTML=view.profile.lastSynced?`Última ligação: <time class="measured">${esc(new Date(view.profile.lastSynced).toLocaleString('pt-PT'))}</time>.`:'Ainda não houve sincronização com a tua conta. Podes começar a registar dados offline.';
   $('#sync-pending').innerHTML=view.profile.pending.map(op=>`<li><div><strong>${esc(operationLabel(op))}</strong><p class="muted">${esc(op.error||'Guardada, à espera de envio.')}</p></div>${op.error||view.warnings.some(w=>w.id===op.operationId)?`<button class="secondary" type="button" data-discard="${esc(op.operationId)}">Descartar</button>`:''}</li>`).join('');
   $('#refresh').disabled=false;
- } catch(error) { notify('Não foi possível ler ou guardar dados neste navegador. '+error.message); }
+ } catch(error) { $('#connection').textContent='Não foi possível abrir o armazenamento deste navegador.';notify('Não foi possível ler ou guardar dados neste navegador. '+error.message); }
 }
 function operationLabel(op) {
  return ({PRODUCT_CREATE:'Alimento: '+(op.data.name||''),PURCHASE_CREATE:'Compra: '+(op.data.store||''),CONSUME:'Saída de estoque',INVENTORY_CAPTURE:'Contagem de inventário revista',CHECKOUT:'Finalizar compras: '+(op.data.items?.length||0)+' item(ns)',SHOPPING_IMPORT:'Carregar lista de compras',SHOPPING_CHECK:'Marcação da lista',SHOPPING_DETAILS:'Quantidade e notas da lista'})[op.kind]||'Alteração pendente';
@@ -132,10 +132,6 @@ bindForm('#consume-form',async data=>{
  if(!product||quantity(data.quantity)>quantity(product.stock))throw Error('Quantidade superior ao estoque disponível.');
  await save('CONSUME',data.productId,{quantity:Number(data.quantity),reason:data.reason});$('#consume-form').reset();notify('Saída guardada neste navegador.',true);
 });
-bindForm('#settings-form',async()=>{
- cloud.configure({url:$('#supabase-url').value,publishableKey:$('#supabase-key').value});
- notify('Projeto guardado. Inicia sessão para sincronizar os teus dispositivos.',true);
-});
 $('#auth-form').addEventListener('submit',async event=>{
  event.preventDefault();const form=event.target;if(form.dataset.busy)return;form.dataset.busy='true';
  const buttons=[...form.querySelectorAll('button')];buttons.forEach(b=>b.disabled=true);
@@ -150,19 +146,18 @@ $('#auth-form').addEventListener('submit',async event=>{
 });
 $('#signout').addEventListener('click',()=>cloud.logout().catch(e=>notify(e.message)));
 function renderCloud(view){
- $('#cloud-config-note').textContent=cloud.config?'Projeto: '+cloud.config.url:'Ainda não há um projeto configurado. A aplicação funciona com dados locais até o ligares.';
  $('#auth-form').hidden=Boolean(cloud.user);$('#account-details').hidden=!cloud.user;
  $('#account-email').textContent=cloud.user?.email||'';
  $('#migrate-local').hidden=!cloud.user;$('#import-file').disabled=!cloud.user;
  $('#resume-import').hidden=!view.profile.importDraft;$('#cancel-import').hidden=!view.profile.importDraft;
- $('#account-note').textContent=cloud.user?'Usa esta mesma conta no Mac e no telemóvel. Ao sair, a cópia desta conta fica separada dos dados locais sem sessão.':'Sem sessão: os dados ficam apenas neste navegador. Inicia sessão para sincronizar entre dispositivos.';
+ $('#account-note').textContent=cloud.user?'Usa esta mesma conta no Mac e no telemóvel. Ao sair, a cópia desta conta fica separada dos dados locais sem sessão.':'Cria a tua conta no FoodStock ou inicia sessão para teres a mesma despensa no Mac e no telemóvel. Podes continuar a usar a cópia local sem sessão.';
 }
 let importing=false;
 async function importToCloud(data){
  if(importing)return;
  if(data&&!confirm(`Importar ${data.products?.length||0} alimento(s) e ${data.purchases?.length||0} compra(s) para esta conta? Só é permitido numa conta vazia. A cópia original será preservada.`))return;
  importing=true;
- try{await localStore.importData(data);await reloadLocal(true);notify('Dados importados para o Supabase. A cópia original foi preservada.',true);}
+ try{await localStore.importData(data);await reloadLocal(true);notify('Dados importados para a tua conta. A cópia original foi preservada.',true);}
  finally{importing=false;await reloadLocal();}
 }
 $('#migrate-local').addEventListener('click',async()=>{try{await importToCloud(await localStore.legacy());}catch(e){notify(e.message);}});
@@ -200,18 +195,17 @@ function navigate() {
   $('#page-title').textContent=document.querySelector(`nav a[href="#${id}"]`).dataset.title;
   requestAnimationFrame(()=>window.scrollTo({top:0,behavior:'instant'}));
 }
-$('#refresh').addEventListener('click',()=>{ $('#message').hidden=true;refresh(); });
+$('#refresh').addEventListener('click',()=>{ $('#message').hidden=true;refresh().catch(error=>notify(error.message)); });
 $('#year').value=new Date().getFullYear();
 $('#year').addEventListener('change',()=>{if($('#year').checkValidity())reloadLocal(true);});
 $('#search').addEventListener('input',renderInventory);
-$('#supabase-url').value=cloud.config?.url||'';$('#supabase-key').value=cloud.config?.publishableKey||'';
 $('#purchase-form [name=purchasedOn]').value=today();$('#purchase-form [name=purchasedOn]').max=today();
 window.addEventListener('hashchange',navigate);navigate();startStore();await reloadLocal(true);refresh().catch(error=>notify(error.message));
 setInterval(()=>{if(!document.hidden)refresh().catch(()=>{});},15000);
 window.addEventListener('online',()=>refresh().catch(()=>{}));
 window.addEventListener('focus',()=>refresh().catch(()=>{}));
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh().catch(()=>{});});
-if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{ $('#offline-cache-note').textContent='Os dados ficam guardados, mas este navegador não conseguiu preparar a interface para abrir sem Internet.'; });
+
 
 // The existing sidebar becomes a native disclosure on smaller screens.
 const compactNavigation = matchMedia('(max-width: 60rem)');

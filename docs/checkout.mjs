@@ -1,4 +1,4 @@
-import {checkoutDraft,cents} from './model.mjs';
+import {checkoutDraft,cents} from './model.mjs?v=20261103.1';
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=new Intl.NumberFormat('pt-PT',{style:'currency',currency:'EUR'});
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
@@ -94,7 +94,7 @@ export class Checkout {
    await this.writes;await store.saveCheckoutDraft(draft);
    await store.enqueue('CHECKOUT',draft.id,data);if(store!==this.getStore())return;
    this.draft=null;this.visible=false;this.panel.hidden=true;this.panel.innerHTML='';await this.reload();
-   this.notify('Compras guardadas. O stock e os gastos foram atualizados; os itens foram desmarcados. A sincronização com o Supabase é automática.',true);
+   this.notify('Compras guardadas. O stock e os gastos foram atualizados; os itens foram desmarcados. A sincronização com a tua conta é automática.',true);
    document.querySelector('#shopping-status').scrollIntoView({block:'center',behavior:'instant'});
   }finally{button.disabled=false;if(store===this.getStore()){this.saving=false;this.update(await store.view());}}
  }

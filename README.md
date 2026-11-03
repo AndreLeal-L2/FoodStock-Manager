@@ -4,17 +4,20 @@ Despensa, lista de compras, gastos e preços. Front-end estático no **GitHub Pa
 
 Site: **https://andreleal-l2.github.io/FoodStock-Manager/**
 
-A aplicação funciona offline com IndexedDB e uma fila persistente. A ligação real à nuvem requer criar/configurar um projeto Supabase. Este repositório não inclui credenciais nem cria um projeto automaticamente. A identificação por fotografia está implementada como integração opcional; requer uma Edge Function e um fornecedor de visão configurados. Os testes de visão usam respostas simuladas, não demonstram precisão de reconhecimento real.
+A aplicação funciona offline com IndexedDB e uma fila persistente. O projeto Supabase do FoodStock já está definido em `docs/config.mjs`, com o URL e a chave pública fornecidos pelo responsável. A aplicação mostra apenas a conta FoodStock (email/palavra-passe); não pede configuração do fornecedor aos utilizadores. Credenciais administrativas e chaves de IA ficam fora do site. A identificação por fotografia está implementada como integração opcional; requer uma Edge Function e um fornecedor de visão configurados. Os testes de visão usam respostas simuladas, não demonstram precisão de reconhecimento real.
 
-## Configurar o Supabase
+## Administração do Supabase
+
+Os passos seguintes destinam-se ao responsável pelo projeto, por exemplo ao criar uma instalação própria. Os utilizadores apenas abrem o site e criam/iniciam sessão na conta FoodStock. O responsável informou que já executou a migração do projeto atual; não é necessário repeti-la.
 
 1. Cria um projeto em [Supabase](https://supabase.com/dashboard). Guarda a palavra-passe da base em privado.
 2. Abre **SQL Editor**, cria uma query e executa o conteúdo completo de [supabase/migrations/202611020001_foodstock.sql](supabase/migrations/202611020001_foodstock.sql). O ficheiro destina-se a uma instalação nova; para futuras alterações, adiciona migrações, não repitas a inicial sobre tabelas existentes.
 3. Em **Authentication → Providers**, ativa Email/Password e a confirmação de email. Em **URL Configuration**, usa `https://andreleal-l2.github.io/FoodStock-Manager/` como Site URL. Cria/confirma a tua conta. Depois de criares as contas necessárias, podes desativar novos registos públicos no Supabase.
 4. Em **Project Settings → API** (ou **Connect → API Keys**), copia o **Project URL** e a chave **publishable** ou a antiga **anon**. Não uses `service_role`, `sb_secret_…` nem a palavra-passe da base no site.
-5. No FoodStock, abre **Dados → Configurar o projeto**, preenche o URL e a chave pública e guarda. Inicia sessão. Repete no telemóvel usando **o mesmo projeto e a mesma conta**.
+5. Define o URL e a chave pública em [docs/config.mjs](docs/config.mjs), atualiza a revisão dos ficheiros com `npm run release:client -- NOVA_REVISAO` e publica o site. Estes valores já estão preenchidos para esta instalação.
+6. No FoodStock, abre **Dados → A tua conta FoodStock**, cria/confirma uma conta e inicia sessão. Usa a mesma conta no Mac e no telemóvel. A conta do painel administrativo Supabase e a conta da aplicação são separadas.
 
-Opcionalmente, podes colocar apenas o URL e a chave pública em [docs/config.mjs](docs/config.mjs), para os dispositivos não precisarem de os preencher. São valores públicos; a privacidade depende de Auth/RLS. As definições guardadas num navegador têm prioridade sobre esse ficheiro.
+O URL e a publishable/anon key são públicos; a privacidade depende de Auth/RLS. Definições antigas do fornecedor guardadas no navegador deixaram de alterar a ligação da aplicação. As sessões e os perfis de dados existentes mantêm-se separados por projeto/conta e não são apagados.
 
 Com a CLI Supabase já instalada, a alternativa ao SQL Editor é:
 
@@ -30,7 +33,7 @@ A autenticação e a aplicação da migração precisam de ser feitas por algué
 
 **Primeiro exporta um backup JSON no navegador com os dados mais completos. Não limpes os dados do site.**
 
-1. Configura o Supabase e inicia sessão numa conta vazia.
+1. Inicia sessão numa conta FoodStock vazia.
 2. Em **Dados**, escolhe **Migrar dados deste navegador**. A aplicação mostra o número de alimentos e compras antes de confirmar.
 3. Em alternativa, usa **Importar backup JSON**. São aceites os backups do navegador e os exports antigos da API Java (`/api/export`). Os backups do navegador contêm a projeção com as alterações ainda por enviar; não é preciso voltar a reproduzir a fila antiga.
 4. A importação grava o **stock atual**, o histórico, os movimentos e a lista numa transação. Não volta a somar as compras ao stock e não substitui uma conta que já contenha dados.
@@ -97,7 +100,7 @@ Sem Java, basta servir `docs/`:
 python3 -m http.server 4173 --directory docs
 ```
 
-Abre `http://localhost:4173`. Podes usar a aplicação offline sem projeto configurado. Para testar sincronização real, configura o teu projeto em Dados.
+Abre `http://localhost:4173`. Podes usar a cópia local offline; a sincronização usa o projeto definido em `docs/config.mjs` e a tua conta FoodStock. Não há campos para configurar o fornecedor na aplicação.
 
 ```sh
 npm ci
@@ -110,3 +113,12 @@ No macOS, `FOODSTOCK_BROWSER` pode apontar para `/Applications/Google Chrome.app
 Os testes executam o modelo offline, a migração/RPCs/RLS em PostgreSQL local via PGlite e o handler de reconhecimento com fornecedor simulado. O teste Chromium usa um perfil e uma base temporários: verifica migração, autenticação, renovação de sessão, isolamento entre contas, fila/reinício/reenvio, confirmação de compras, revisão de fotografia e sete larguras de ecrã. Não usa fotos pessoais, não chama o fornecedor de IA e não demonstra precisão de visão nem substitui uma verificação final num projeto Supabase real.
 
 O GitHub Actions executa os testes e checks; o workflow Pages publica exclusivamente `docs/`. `backend/` permanece apenas para migração/exportação da versão antiga, fora da aplicação ativa.
+
+
+## Publicar atualizações da interface
+
+Antes de publicar alterações ao front-end, executa `npm run release:client -- NOVA_REVISAO` (por exemplo `20261103.1`). O script mantém a mesma revisão no HTML, no grafo completo de módulos, nos estilos e no service worker. Assim, um navegador com ficheiros antigos em cache não os mistura com o HTML de uma versão nova.
+
+O carregador inicial regista a atualização offline mesmo quando um módulo falha. Em caso de erro ou demora excessiva, aparece **Recarregar interface** em vez de ficar indefinidamente em “A abrir os dados”. Essa ação remove apenas caches `foodstock-shell-*` e o service worker desta aplicação; preserva IndexedDB, sessões, stock, compras, rascunhos e fila pendente. A página recarrega para obter os ficheiros atuais. Não uses “Limpar dados do site” para resolver uma atualização.
+
+O teste de atualização reproduz uma cache v5 anterior à migração, passa para o HTML atual e verifica abertura de Dados, conta FoodStock sem campos técnicos e preservação do stock/fila/rascunho. Também simula um módulo indisponível e verifica a recuperação sem apagar dados ou caches de outras aplicações.

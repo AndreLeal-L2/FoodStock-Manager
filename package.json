@@ -3,8 +3,9 @@
   "private": true,
   "scripts": {
     "test": "node tests/model.test.mjs && node tests/supabase.test.mjs && node tests/vision.test.mjs && node tests/auth.test.mjs",
-    "test:browser": "node tests/offline-browser.cjs",
-    "check": "node --check docs/app.js && node --check docs/store.mjs && node --check docs/model.mjs && node --check docs/cloud.mjs && node --check docs/checkout.mjs && node --check docs/vision.mjs && node --check docs/vision-model.mjs && node --check docs/sw.js"
+    "test:browser": "node tests/offline-browser.cjs && node tests/upgrade-browser.cjs",
+    "check": "node --check docs/app.js && node --check docs/store.mjs && node --check docs/model.mjs && node --check docs/cloud.mjs && node --check docs/checkout.mjs && node --check docs/vision.mjs && node --check docs/vision-model.mjs && node --check docs/sw.js && node --check docs/boot.js",
+    "release:client": "node scripts/release-client.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.3.14",

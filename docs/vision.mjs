@@ -1,4 +1,4 @@
-import {photoDraft,captureData,categories} from './vision-model.mjs';
+import {photoDraft,captureData,categories} from './vision-model.mjs?v=20261103.1';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function compress(file){
  if(!file.type.startsWith('image/')||file.size>20*1024*1024)throw Error('Escolhe uma imagem até 20 MB.');
@@ -31,12 +31,12 @@ export class Vision {
   this.view=view;
   if(this.scope!==view.profile.key){this.reset();this.scope=view.profile.key;}
   if(!this.draft&&view.profile.photoDraft){this.draft=structuredClone(view.profile.photoDraft);this.render();}
-  document.querySelector('#photo-requirements').textContent=this.cloud.user?'Escolhe uma fotografia para analisar online. Os resultados só entram no stock depois da tua revisão.':'Para reconhecer alimentos, configura o Supabase e inicia sessão em Dados. Podes continuar a registar alimentos manualmente.';
+  document.querySelector('#photo-requirements').textContent=this.cloud.user?'Escolhe uma fotografia para analisar online. Os resultados só entram no stock depois da tua revisão.':'Para reconhecer alimentos, inicia sessão na tua conta FoodStock em Dados. Podes continuar a registar alimentos manualmente.';
  }
  reset(){clearTimeout(this.timer);this.abort?.abort();this.draft=null;this.image=null;this.busy=false;this.panel.innerHTML='';this.panel.hidden=true;this.preview.removeAttribute('src');this.preview.hidden=true;document.querySelector('#photo-analyze').disabled=true;document.querySelector('#photo-status').textContent='';}
  async choose(file){
   if(!file||this.busy)return;
-  const store=this.getStore(),image=await compress(file);if(store!==this.getStore())return;this.image=image;this.preview.src=image;this.preview.hidden=false;document.querySelector('#photo-analyze').disabled=false;document.querySelector('#photo-status').textContent='Fotografia preparada. A análise envia esta imagem ao serviço de reconhecimento; não fica guardada no Supabase.';
+  const store=this.getStore(),image=await compress(file);if(store!==this.getStore())return;this.image=image;this.preview.src=image;this.preview.hidden=false;document.querySelector('#photo-analyze').disabled=false;document.querySelector('#photo-status').textContent='Fotografia preparada. A análise envia esta imagem ao serviço de reconhecimento; não fica guardada na tua conta.';
  }
  async analyze(){
   if(this.busy||!this.image)return;
