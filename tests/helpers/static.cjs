@@ -1,0 +1,4 @@
+const fs=require('node:fs/promises'),path=require('node:path'),http=require('node:http');const {once}=require('node:events');
+module.exports=async function startStatic(){
+ const root=path.resolve(__dirname,'../../docs');const server=http.createServer(async(req,res)=>{try{let file=new URL(req.url,'http://test').pathname;if(file.endsWith('/'))file+='index.html';const full=path.resolve(root,'.'+decodeURIComponent(file));if(!full.startsWith(root+path.sep))throw Error();res.setHeader('Content-Type',({'.html':'text/html','.mjs':'text/javascript','.js':'text/javascript','.css':'text/css','.ttf':'font/ttf','.wasm':'application/wasm','.json':'application/json'})[path.extname(full)]||'application/octet-stream');res.end(await fs.readFile(full));}catch{res.writeHead(404);res.end();}});server.listen(0,'127.0.0.1');await once(server,'listening');return {origin:`http://127.0.0.1:${server.address().port}`,close:()=>new Promise(r=>server.close(r))};
+};

@@ -1,47 +1,52 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';import {PNG} from 'pngjs';
-import {ALGORITHM,extractFeatures,matchReferences,validateFeatures} from '../docs/vision-engine.mjs';
-import {validateCatalog,exportCatalog,detectionsToItems} from '../docs/vision-catalog.mjs';
+import test from 'node:test';import assert from 'node:assert/strict';
+import {foodForLabel,FOOD_PROMPT} from '../docs/food-labels.mjs';
+import {processPredictions} from '../docs/vision-results.mjs';
+import {resolveModelRevision} from '../docs/vision-model-files.mjs';
+import {LocalFoodRecognizer} from '../docs/vision-runtime.mjs';
+import {VisionModelClient} from '../docs/vision-client.mjs';
 import {photoDraft,captureData} from '../docs/vision-model.mjs';
-const image=PNG.sync.read(await readFile(new URL('./fixtures/box.png',import.meta.url))),photo=PNG.sync.read(await readFile(new URL('./fixtures/box-in-scene.png',import.meta.url)));
-const features=extractFeatures(image,{reference:true}),reference={id:'rice-ref',name:'Arroz',category:'Hidratos e acompanhamentos',brand:'',productId:'rice',unit:'kg',features,preview:'data:image/png;base64,iVBORw0KGgo='};
-const scene=extractFeatures(photo);
-test('classical local features locate an actual photographed reference under viewpoint change',()=>{
- const found=matchReferences(scene,[reference]);assert.equal(found.length,1);assert.equal(found[0].referenceId,'rice-ref');assert.ok(found[0].matches>=14);
- const xs=found[0].polygon.map(p=>p[0]),ys=found[0].polygon.map(p=>p[1]);assert.ok(Math.min(...xs)>60&&Math.max(...xs)<320);assert.ok(Math.min(...ys)>120&&Math.max(...ys)<330);
+const box=(xmin=0,ymin=0,xmax=100,ymax=100)=>({xmin,ymin,xmax,ymax});
+const prediction=(label,score=.8,b=box())=>({label,score,box:b});
+const image=()=>({width:100,height:100,data:new Uint8ClampedArray(100*100*4)});
+test('automatic vocabulary covers pantry foods without a user reference catalogue',()=>{
+ assert.equal(foodForLabel('bag of rice').name,'Arroz');assert.equal(foodForLabel('canned beans').name,'Feijão');assert.equal(foodForLabel('tomato sauce').name,'Polpa de tomate');assert.equal(foodForLabel('orange juice').name,'Sumo');assert.equal(foodForLabel('potato chips').name,'Batatas fritas');assert.equal(foodForLabel('spaceship'),null);assert.equal(foodForLabel('rice milk'),null);assert.ok(FOOD_PROMPT.includes('rice.'));
 });
-test('photometric changes preserve matches without a learned model',()=>{
- const changed={width:photo.width,height:photo.height,data:Uint8Array.from(photo.data,(v,i)=>i%4===3?255:Math.round(v*.75+25))};assert.equal(matchReferences(extractFeatures(changed),[reference]).length,1);
+test('model results reject unknown/weak/invalid predictions, clip boxes and deduplicate overlapping products',()=>{
+ const result=processPredictions([prediction('rice',.9,box(-20,-10,80,90)),prediction('rice',.8,box(0,0,75,85)),prediction('beans',.8,box(110,10,180,90)),prediction('spaceship'),prediction('milk',.1),prediction('water bottle',NaN),prediction('eggs',.8,{...box(),xmax:Infinity})],200,100);
+ assert.equal(result.items.length,2);assert.deepEqual(result.items.map(i=>i.name),['Arroz','Feijão']);assert.equal(result.detections[0].box.xmin,0);assert.equal(result.items[0].visibleCount,1);assert.equal(result.items[0].quantity,null);assert.equal(result.items[0].unit,null);assert.equal(result.items[0].brand,'');
 });
-test('two separated copies are counted by geometric detections, not by a provider response',()=>{
- const width=780,height=400,data=new Uint8Array(width*height*4).fill(255);
- for(const [ox,oy] of [[20,30],[420,140]])for(let y=0;y<image.height;y++)for(let x=0;x<image.width;x++)for(let c=0;c<4;c++)data[((y+oy)*width+x+ox)*4+c]=image.data[(y*image.width+x)*4+c];
- const found=matchReferences(extractFeatures({width,height,data}),[reference]);assert.equal(found.length,2);
+test('separate boxes count visible packages, while physical inventory remains a reviewed value',()=>{
+ const {items}=processPredictions([prediction('rice',.9,box(0,0,80,90)),prediction('rice',.8,box(110,10,180,90))],200,100);assert.equal(items[0].visibleCount,2);
+ const draft=photoDraft(items,[{id:'rice',name:'Arroz',unit:'kg',stock:4.25}]);assert.equal(draft.items[0].quantity,'');assert.equal(draft.items[0].expectedStock,4.25);draft.items[0].quantity='2';assert.equal(captureData(draft).items[0].quantity,2);
+ assert.equal(processPredictions([],200,100).items.length,0);
 });
-test('unknown or textureless images are rejected and cannot turn into stock',()=>{
- const blank={width:400,height:300,data:new Uint8Array(400*300*4).fill(160)};assert.equal(matchReferences(extractFeatures(blank),[reference]).length,0);
- let seed=234;const noise=Uint8Array.from(blank.data,(_,i)=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return i%4===3?255:seed>>>24;});assert.equal(matchReferences(extractFeatures({...blank,data:noise}),[reference]).length,0);
- assert.throws(()=>validateFeatures({...features,algorithm:'unknown-version'}),/incompatível/);
+function fakeLibrary({failGpuLoad=false,failGpuRun=false}={}){
+ const calls={downloads:[],images:[],disposed:0};
+ const processor=Object.assign(async(raw,prompt)=>{calls.images.push(raw);assert.ok(prompt.includes('rice.'));return {pixel_values:'private-in-memory',input_ids:[1]};},{image_processor:{size:{}},post_process_grounded_object_detection:()=>[{boxes:[[0,0,80,90]],labels:['rice'],scores:[.8]}]});
+ const library={env:{backends:{onnx:{wasm:{}}}},RawImage:class{constructor(data,width,height,channels){Object.assign(this,{data,width,height,channels});}},AutoProcessor:{from_pretrained:async(id,options)=>{calls.downloads.push({id,options});return processor;}},AutoModelForZeroShotObjectDetection:{from_pretrained:async(id,options)=>{calls.downloads.push({id,options});if(failGpuLoad&&options.device==='webgpu')throw Error('GPU unavailable');return Object.assign(async inputs=>{assert.equal(inputs.pixel_values,'private-in-memory');if(failGpuRun&&options.device==='webgpu')throw Error('GPU op unsupported');return {};},{dispose:async()=>calls.disposed++});}}};return {library,calls};
+}
+test('model adapter keeps pixels local, loads public weights once and reuses the prepared model',async()=>{
+ const {library,calls}=fakeLibrary();let loads=0;const recognizer=new LocalFoodRecognizer({revisionResolver:async()=>'a'.repeat(40),libraryLoader:async()=>{loads++;return library;},gpu:null});
+ assert.equal((await recognizer.recognize(image())).items[0].name,'Arroz');await recognizer.recognize(image());assert.equal(loads,1);assert.equal(calls.downloads.length,2);assert.equal(calls.images.length,2);assert.equal(calls.images[0].channels,4);assert.ok(calls.downloads.every(call=>!('image' in call.options)));assert.equal(library.env.backends.onnx.wasm.numThreads,1);assert.equal(library.env.useBrowserCache,true);await recognizer.dispose();assert.equal(calls.disposed,1);
 });
-test('catalogues validate bounded metadata and descriptors; importing cannot fetch external images',()=>{
- const catalog=exportCatalog([reference]);assert.equal(catalog.algorithm,ALGORITHM);assert.equal(validateCatalog(JSON.parse(JSON.stringify(catalog)))[0].features.descriptors.length,features.descriptors.length);
- assert.throws(()=>validateCatalog({...catalog,references:[{...reference,preview:'https://tracker.example/photo'}]}),/inválidos/);
- assert.throws(()=>validateCatalog({...catalog,references:[reference,reference]}),/repetidas/);
- assert.throws(()=>validateCatalog({...catalog,references:[{...reference,features:{...features,descriptors:[-1]}}]}),/inválida/);
+test('GPU initialization and unsupported GPU operators both fall back to local CPU execution',async()=>{
+ for(const key of ['failGpuLoad','failGpuRun']){const {library,calls}=fakeLibrary({[key]:true}),progress=[];const recognizer=new LocalFoodRecognizer({revisionResolver:async()=>'a'.repeat(40),libraryLoader:async()=>library,gpu:{requestAdapter:async()=>({})},onProgress:p=>progress.push(p)});const result=await recognizer.recognize(image());assert.equal(result.model.device,'wasm');assert.ok(progress.some(p=>p.stage==='fallback'));assert.ok(calls.downloads.some(call=>call.options.device==='wasm'));}
 });
-test('reference metadata and geometric counts require explicit physical quantities and inventory review',()=>{
- const items=detectionsToItems([{referenceId:reference.id},{referenceId:reference.id}],[reference]);assert.equal(items[0].visibleCount,2);assert.equal(items[0].quantity,null);assert.equal(items[0].brand,'');
- const draft=photoDraft(items,[{id:'rice',name:'Arroz',stock:4.25,unit:'kg'}]);assert.equal(draft.items[0].quantity,'');assert.equal(draft.items[0].expectedStock,4.25);draft.items[0].quantity='2';assert.equal(captureData(draft).items[0].quantity,2);assert.equal(captureData(draft).items[0].newProduct,null);
+test('load failures cannot fabricate detections or require personal reference data',async()=>{
+ const recognizer=new LocalFoodRecognizer({revisionResolver:async()=>'a'.repeat(40),libraryLoader:async()=>{throw Error('offline download');}});await assert.rejects(recognizer.recognize(image()),/offline download/);
+});
+class FakeWorker {constructor(){this.messages=[];this.terminated=false;}postMessage(message){this.messages.push(message);}terminate(){this.terminated=true;}reply(result,id=this.messages.at(-1).id){this.onmessage({data:{id,result}});}}
+test('client reuses a worker, rejects concurrent jobs and ignores stale replies',async()=>{
+ const workers=[],client=new VisionModelClient({workerFactory:()=>{const w=new FakeWorker();workers.push(w);return w;}});const first=client.recognize(image());await assert.rejects(client.recognize(image()),/curso/);workers[0].reply({items:[]},'stale-id');assert.ok(client.job);workers[0].reply({items:[]});assert.deepEqual(await first,{items:[]});const second=client.recognize(image());assert.equal(workers.length,1);workers[0].reply({items:[]});await second;client.dispose();assert.equal(workers[0].terminated,true);
+});
+test('cancel and cache clearing terminate inference while preserving all stock/session stores',async()=>{
+ const w=new FakeWorker(),client=new VisionModelClient({workerFactory:()=>w}),abort=new AbortController(),promise=client.recognize(image(),{signal:abort.signal});abort.abort();await assert.rejects(promise,{name:'AbortError'});assert.equal(w.terminated,true);assert.equal(client.worker,null);
+ const original=globalThis.caches,deleted=[];globalThis.caches={delete:async name=>deleted.push(name)};try{await client.clearModel();assert.deepEqual(deleted,['foodstock-ai-model-v1']);}finally{globalThis.caches=original;}
 });
 
-test('visually identical references with different identities are ambiguous rather than guessed',()=>{
- const other={...reference,id:'beans-ref',name:'Feijão',productId:'beans'};assert.equal(matchReferences(scene,[reference,other]).length,0);
-});
-test('a quarter-turn of a known reference is matched by geometric orientation',()=>{
- const width=image.height,height=image.width,data=new Uint8Array(width*height*4);
- for(let y=0;y<image.height;y++)for(let x=0;x<image.width;x++)for(let c=0;c<4;c++)data[(x*width+(width-1-y))*4+c]=image.data[(y*image.width+x)*4+c];
- assert.equal(matchReferences(extractFeatures({width,height,data}),[reference]).length,1);
-});
-test('multiple views of the same label remain compatible before and after stock association',()=>{
- const unlinked={...reference,id:'unlinked-rice',name:'arroz',productId:null};assert.equal(matchReferences(scene,[reference,unlinked]).length,1);
- const result=detectionsToItems([{referenceId:reference.id},{referenceId:unlinked.id}],[reference,unlinked]);assert.equal(result.length,1);assert.equal(result[0].productId,'rice');assert.equal(result[0].visibleCount,2);
+test('first model download pins a public immutable revision and can reopen without network',async()=>{
+ const entries=new Map(),calls=[];const cache={match:async key=>entries.get(key)?.clone(),put:async(key,value)=>entries.set(key,value)},storage={open:async()=>cache};
+ const revision=await resolveModelRevision({cacheStorage:storage,fetcher:async(url,options)=>{calls.push({url,options});return new Response(JSON.stringify({sha:'b'.repeat(40),private:false,gated:false}));}});assert.equal(revision,'b'.repeat(40));assert.equal(calls.length,1);assert.equal(calls[0].options.credentials,'omit');
+ assert.equal(await resolveModelRevision({cacheStorage:storage,fetcher:async()=>{throw Error('offline');}}),revision);assert.equal(entries.size,1);
+ await assert.rejects(resolveModelRevision({cacheStorage:null,fetcher:async()=>new Response(JSON.stringify({sha:'invalid'}))}),/download público/);
 });

@@ -56,3 +56,8 @@ The initial loader uses a revisioned module graph and offers interface-only reco
 ## Local classical vision
 
 Photo recognition uses an on-device worker and registered visual references. The capture panel offers a collapsible reference catalogue, optional touch/mouse crop, local progress/cancel controls, overlaid geometric matches and mandatory inventory review. References and thumbnails stay in the account-scoped browser profile, with explicit JSON export/import. There are no provider credentials, AI calls or generic semantic identification. Existing blue/grey tokens and six destinations remain.
+
+
+## Reference-free local AI
+
+The photo panel no longer exposes a reference catalogue or registration flow. A free open detector loads only on first analysis, processes pixels in a reusable local worker and shows download/inference progress and cancel. The first large download is disclosed before the user starts. Users can release model storage without clearing their account data, and manual inventory entry remains available on unsupported devices. No photo is uploaded for inference. Labels/quantities remain suggestions until mandatory review; the existing blue/grey mobile forms are preserved.

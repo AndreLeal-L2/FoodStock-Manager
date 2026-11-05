@@ -1,4 +1,4 @@
-import defaults from './config.mjs?v=20261103.2';
+import defaults from './config.mjs?v=20261104.1';
 export class CloudError extends Error {constructor(message,status){super(message);this.status=status;}}
 export function validateConfig(value){
  const url=new URL(value.url);

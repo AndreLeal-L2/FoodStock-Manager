@@ -1,0 +1,12 @@
+import {build} from 'esbuild';
+import {mkdir,copyFile,readFile,writeFile} from 'node:fs/promises';
+const root=new URL('../',import.meta.url),output=new URL('docs/vendor/vision-4.3.2/',root);
+await mkdir(output,{recursive:true});
+await build({entryPoints:[new URL('./vision-entry.mjs',import.meta.url).pathname],bundle:true,format:'esm',platform:'browser',conditions:['browser'],target:['chrome113','safari17'],minify:true,legalComments:'linked',outfile:new URL('transformers.mjs',output).pathname});
+for(const file of ['ort-wasm-simd-threaded.jsep.mjs','ort-wasm-simd-threaded.jsep.wasm'])await copyFile(new URL('node_modules/onnxruntime-web/dist/'+file,root),new URL(file,output));
+await copyFile(new URL('node_modules/@huggingface/transformers/LICENSE',root),new URL('TRANSFORMERS-LICENSE.txt',output));
+const ortLicence=`ONNX Runtime Web\nMicrosoft Corporation and contributors\nMIT License\n\nCopyright (c) Microsoft Corporation. All rights reserved.\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\n`;
+await writeFile(new URL('ONNX-RUNTIME-LICENSE.txt',output),ortLicence);
+const pkg=JSON.parse(await readFile(new URL('node_modules/onnxruntime-web/package.json',root),'utf8'));
+await writeFile(new URL('versions.json',output),JSON.stringify({transformers:'4.3.2',onnxruntime:pkg.version},null,2)+'\n');
+console.log('Browser vision runtime built in docs/vendor/vision-4.3.2 (weights download separately on first analysis).');

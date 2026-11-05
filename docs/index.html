@@ -7,8 +7,8 @@
   <meta name="description" content="Organiza os alimentos de casa, regista as compras e compara gastos e preços por unidade com dados privados sincronizados entre os teus dispositivos.">
   <title>FoodStock · A tua despensa, em dia</title>
   <link rel="preload" href="fonts/host-grotesk.ttf" as="font" type="font/ttf" crossorigin>
-  <link rel="stylesheet" href="style.css?v=20261103.2">
-  <script src="boot.js?v=20261103.2" defer></script>
+  <link rel="stylesheet" href="style.css?v=20261104.1">
+  <script src="boot.js?v=20261104.1" defer></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -45,13 +45,11 @@
       <article class="inventory-panel"><div class="section-heading"><h2>Na despensa</h2><label class="search">Procurar<input id="search" type="search" placeholder="Nome do alimento"></label></div><div id="inventory"></div></article>
       <article class="photo-panel form-panel"><h2>Identificar alimentos por fotografia</h2><p id="photo-requirements" class="muted"></p>
         <p class="hint">Fotografa os alimentos separados, com rótulos visíveis e boa luz. A identificação pode falhar: vais rever os nomes, as categorias e as quantidades antes de guardar. A marca é opcional.</p>
-        <details id="visual-catalog"><summary>Referências visuais <span id="reference-count"></span></summary><p class="hint">Cadastra uma embalagem de cada vez, de frente, com texto ou desenhos nítidos. Podes arrastar sobre a foto para selecionar só a frente. Não há treino de IA: guardamos os pontos e padrões visuais para comparação. Guardar uma referência não cria stock nem gastos.</p>
-         <form id="reference-form"><label>Alimento<select name="productId"></select></label><label>Nome do alimento<input name="name" maxlength="120" required></label><div class="form-row"><label>Categoria<select name="category" required></select></label><label>Marca (opcional)<input name="brand" maxlength="120"></label></div><label>Unidade<select name="unit" required><option value="">Escolher unidade</option><option value="kg">kg</option><option value="L">L</option><option value="un">un</option></select></label><label>Foto de referência<input name="image" type="file" accept="image/*" required></label><canvas id="reference-crop" class="photo-preview" aria-label="Selecionar a frente da embalagem" hidden></canvas><button id="reference-whole" type="button" class="secondary">Usar imagem completa</button><p id="reference-status" role="status"></p><button type="submit">Guardar referência visual</button></form>
-         <ul id="reference-list" class="reference-list"></ul><div class="checkout-actions"><button id="reference-export" type="button" class="secondary">Exportar referências</button></div><label>Importar referências JSON<input id="reference-import" type="file" accept="application/json,.json"></label><p class="hint">As referências ficam apenas neste navegador, separadas por conta. Para as usar no Mac, no telemóvel ou noutra conta, exporta o catálogo e importa-o no destino. O stock confirmado continua a sincronizar com a tua conta.</p>
-        </details>
         <div class="photo-inputs"><label>Escolher imagem<input data-photo-input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif"></label><label>Tirar fotografia<input data-photo-input type="file" accept="image/*" capture="environment"></label></div>
-        <canvas id="photo-preview" class="photo-preview" role="img" aria-label="Fotografia e correspondências de embalagens" hidden></canvas><p id="photo-status" role="status"></p>
-        <div class="checkout-actions"><button id="photo-analyze" type="button" disabled>Analisar neste dispositivo</button><button id="photo-cancel" type="button" class="secondary" hidden>Cancelar análise</button></div><p class="hint">Visão computacional clássica, sem IA nem APIs de reconhecimento. A foto não é enviada a serviços externos. Funciona offline depois do primeiro acesso. O programa reconhece referências cadastradas; não identifica automaticamente alimentos ou marcas desconhecidos.</p>
+        <canvas id="photo-preview" class="photo-preview" role="img" aria-label="Fotografia e alimentos sugeridos pelo modelo" hidden></canvas><p id="photo-status" role="status"></p>
+        <div class="checkout-actions"><button id="photo-analyze" type="button" disabled>Identificar produtos</button><button id="photo-cancel" type="button" class="secondary" hidden>Cancelar análise</button><button id="photo-manual" type="button" class="secondary">Adicionar manualmente</button></div>
+        <p class="hint">Sem cadastro de referências. Usa um modelo de IA aberto e gratuito que corre no dispositivo, sem API paga de reconhecimento. A foto não é enviada para análise. Na primeira utilização é necessário descarregar os ficheiros do modelo — podem ocupar centenas de MB e demorar vários minutos. Prefere Wi-Fi. Depois de o download terminar, os ficheiros ficam guardados para reutilização; o reconhecimento offline depende de a cache estar completa e da capacidade do dispositivo.</p>
+        <button id="photo-clear-model" type="button" class="secondary">Libertar espaço do modelo</button>
         <section id="photo-review" hidden aria-label="Revisão dos alimentos identificados"></section>
       </article>
       <div class="two-columns forms-grid">

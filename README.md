@@ -4,7 +4,7 @@ Despensa, lista de compras, gastos e preços. Front-end estático no **GitHub Pa
 
 Site: **https://andreleal-l2.github.io/FoodStock-Manager/**
 
-A aplicação funciona offline com IndexedDB e uma fila persistente. O projeto Supabase do FoodStock já está definido em `docs/config.mjs`, com o URL e a chave pública fornecidos pelo responsável. A aplicação mostra apenas a conta FoodStock (email/palavra-passe); não pede configuração do fornecedor aos utilizadores. Credenciais administrativas ficam fora do site. A identificação por fotografia usa agora um motor próprio de visão computacional clássica, executado no navegador: não usa OpenAI, modelos de IA, Edge Functions de visão ou APIs de reconhecimento pagas.
+A aplicação funciona offline com IndexedDB e uma fila persistente. O projeto Supabase do FoodStock já está definido em `docs/config.mjs`, com o URL e a chave pública fornecidos pelo responsável. A aplicação mostra apenas a conta FoodStock (email/palavra-passe); não pede configuração do fornecedor aos utilizadores. Credenciais administrativas ficam fora do site. A identificação por fotografia usa um modelo visual aberto, executado no dispositivo, sem cadastro de referências, OpenAI ou API paga de reconhecimento. Na primeira utilização é necessário descarregar o modelo; a revisão humana continua obrigatória.
 
 ## Administração do Supabase
 
@@ -42,44 +42,46 @@ A autenticação e a aplicação da migração precisam de ser feitas por algué
 
 A cópia anterior deste navegador mantém-se separada, na chave `primary` do IndexedDB. Terminar sessão volta a essa cópia; não mistura dados entre contas. Os rascunhos anteriores mantêm-se nessa cópia original: conclui-os antes da migração ou retoma-os aí. Cada conta/projeto usa um perfil local separado. Os ficheiros H2 antigos continuam intactos; a aplicação nova não os lê diretamente. As instruções para exportar a API antiga estão em [backend/README.md](backend/README.md).
 
-## Fotografia da despensa: visão clássica local
+## Identificação automática por fotografia
 
-O programa compara imagens com um catálogo de **embalagens cadastradas**. Não interpreta alimentos desconhecidos como um modelo de IA. O nome, a categoria, a unidade e a marca opcional são fornecidos por ti ao cadastrar a referência.
+Em **Despensa**, escolhe ou tira uma fotografia e toca em **Identificar produtos**. Não é necessário cadastrar imagens de referência, marcas ou alimentos antes de analisar. O modelo visual é **Grounding DINO Tiny**, convertido para ONNX em [onnx-community/grounding-dino-tiny-ONNX](https://huggingface.co/onnx-community/grounding-dino-tiny-ONNX), executado por Transformers.js/ONNX Runtime Web.
 
-### Cadastrar referências
+### Primeira utilização e privacidade
 
-1. Em **Despensa → Referências visuais**, associa um alimento existente ou preenche os dados de uma nova referência. Cadastrar uma referência não cria stock, compras ou gastos.
-2. Escolhe uma foto nítida da frente da embalagem. Cadastra uma embalagem de cada vez e evita reflexos, dobras e objetos à frente.
-3. Podes arrastar sobre a foto para selecionar apenas a frente; **Usar imagem completa** mantém toda a foto como referência. Recorta uma área com pelo menos 64 × 64 píxeis, contendo texto/desenhos.
-4. Guarda a referência. Imagens uniformes ou com poucos pontos distinguíveis são rejeitadas. Podes cadastrar mais de uma vista da mesma embalagem, até 24 referências neste navegador/conta.
-5. O catálogo (metadados, padrões visuais e miniaturas) fica no IndexedDB, separado por conta. Para o usar no Mac, no telemóvel ou noutra conta, usa **Exportar referências** e **Importar referências JSON**. A importação não altera o stock. Não há envio automático de fotos ou referências para a base.
+- A primeira análise descarrega os ficheiros públicos do modelo e o runtime. O download pode ter centenas de MB e demorar vários minutos; usa Wi-Fi. Há progresso e cancelamento na interface.
+- Só são feitos pedidos de ficheiros/metadados públicos. A fotografia é descodificada no navegador e enviada como píxeis para um Web Worker local; não é enviada ao Hugging Face, Supabase, OpenAI ou outro serviço de reconhecimento.
+- A primeira revisão do modelo é fixada a um commit imutável do repositório público. Configuração, tokenizer e pesos usam essa mesma revisão, evitando misturar versões. A revisão e os ficheiros ficam na cache `foodstock-ai-model-v1`.
+- O modelo preparado é reutilizado entre fotos. Aceleração WebGPU é tentada quando disponível; falhas de inicialização/operações gráficas usam o processador via WASM. O runtime usa uma thread para funcionar no GitHub Pages sem cabeçalhos COOP/COEP.
+- O desempenho e a memória dependem do dispositivo. Navegadores que reportem menos de 4 GB não iniciam o modelo; recomenda-se experimentar no Mac. Falta de memória, suporte do navegador ou download incompleto podem impedir a análise. O stock/manual mantém-se disponível.
+- Depois de o download/cache terminar, a reabertura e o reconhecimento podem funcionar sem rede. Uma cache parcial, removida ou indisponível precisa de Internet novamente. O navegador pode remover ficheiros por pressão de armazenamento.
+- **Libertar espaço do modelo** termina o worker e remove apenas os ficheiros públicos desse modelo. Mantém alimentos, compras, sessão, rascunhos e alterações por enviar. O próximo reconhecimento volta a descarregar o modelo.
 
-### Identificar uma fotografia
+### Rever e guardar
 
-1. Escolhe uma imagem ou tira uma foto em **Identificar alimentos por fotografia**. JPEG, PNG e WebP são suportados; se o navegador não abrir HEIC, converte-o para JPEG.
-2. Toca em **Analisar neste dispositivo**. Funciona sem sessão e sem Internet depois do primeiro acesso, incluindo os ficheiros do worker em cache. Não há pedidos a fornecedores de visão, chaves de IA ou custo por chamada de reconhecimento.
-3. O motor compara os detalhes visuais cadastrados, verifica a geometria e marca as correspondências na foto. O processamento corre num Web Worker para manter a interface utilizável; podes cancelar a análise.
-4. Revê os nomes, categorias e quantidades. A contagem indica apenas as embalagens com correspondência encontrada: pode haver objetos ocultos ou não identificados. Nunca é convertida automaticamente em kg/litros. Remove erros e adiciona os itens em falta manualmente.
-5. Confirma a **quantidade total que tens em casa**, na unidade do alimento. Para alimentos existentes, o valor substitui o stock anterior. Uma contagem não é uma compra, não inventa preços e não cria gastos. Usa Compras/Finalizar compras para registar despesas.
-6. Marca a revisão e guarda. O rascunho e a contagem são persistidos no navegador; o stock confirmado sincroniza com a tua conta quando houver rede. Conflitos com alterações feitas noutro dispositivo mantêm-se para resolução.
+1. O modelo procura alimentos comuns usando o vocabulário interno em `food-labels.mjs`. Não pede referências pessoais. Uma identificação continua a ser uma sugestão: embalagens fechadas, rótulos pouco visíveis, produtos fora do vocabulário, sobreposição e desfocagem podem produzir erros ou omissões.
+2. As caixas sugeridas são marcadas na foto. As categorias vêm da correspondência com os nomes de alimentos; marcas ilegíveis não são inventadas. A contagem é apenas de objetos/embalagens detetados, não de kg/litros, conteúdo restante ou peças ocultas.
+3. Revê os nomes/categorias, associa a um alimento existente ou cria outro, remove erros e adiciona o que falta. Peso/volume/preço não são inferidos. **Adicionar manualmente** funciona mesmo sem modelo ou foto.
+4. Confirma a **quantidade total em casa**. Para um alimento existente, substitui o stock anterior. A confirmação não cria despesas; compras/preços continuam em Compras/Finalizar compras.
+5. A revisão e a confirmação são guardadas no navegador; o stock confirmado sincroniza com a conta. Uma contagem em conflito com alterações noutro dispositivo continua preservada para resolução.
 
-A fotografia da despensa e os metadados originais não são guardados nem enviados. As miniaturas das referências são geradas por canvas e ficam localmente com o catálogo; o backup do navegador inclui esse catálogo no perfil. O export específico de referências permite transportá-lo entre dispositivos. Limpar os dados do site remove as referências locais, por isso exporta-as antes.
+O sistema anterior de referências deixou de fazer parte da interface. Os dados antigos, se existirem no perfil local, não são apagados e continuam no backup JSON. Não é necessária nova migração SQL nem nenhuma chave de IA/Edge Function de visão.
 
-### Como funciona e quais são os limites
+### Código, distribuição e validação
 
-O código próprio em [docs/vision-engine.mjs](docs/vision-engine.mjs) implementa pontos FAST, orientação pelo centroide de intensidade, descritores binários rotacionados, distância de Hamming e verificação geométrica RANSAC/homografia. Não contém pesos treinados, redes neuronais, OCR, dependências de visão externas nem chamadas de rede. São implementações de técnicas clássicas conhecidas, não algoritmos científicos inventados para este projeto.
-
-O reconhecimento é adequado sobretudo a frentes de embalagens com letras/logótipos/desenhos distintos. Embalagens novas precisam de uma referência; trocar a embalagem, esconder o rótulo, reflexos, desfocagem ou perspetivas fortes podem impedir a correspondência. Fruta solta e embalagens lisas/visualmente iguais não são identificadas de forma genérica. Referências de identidades diferentes que tenham correspondências muito semelhantes na mesma região são rejeitadas como ambíguas. O programa não deduz massa, conteúdo restante, marcas ilegíveis ou itens ocultos. A revisão humana continua obrigatória.
-
-Os testes incluem uma referência fotografada noutro ângulo, luminosidade alterada, cópias separadas, imagens desconhecidas e padrões ambíguos. O teste do navegador executa o worker real com rótulos sintéticos cadastrados, inteiramente offline. Isto demonstra os mecanismos de correspondência, não uma precisão garantida para todas as despensas. Nenhuma fotografia pessoal foi usada como fixture.
-
-A antiga integração de visão paga foi removida do código e da aplicação. O esquema SQL histórico pode conter uma tabela/função de quota antiga, que esta versão não utiliza; **não é preciso voltar a executar a migração** para ativar a visão local. Se chegaste a publicar a função antiga no teu projeto, podes removê-la com a CLI autenticada:
+O modelo é de terceiros e pré-treinado; o projeto não alega tê-lo treinado ou inventado. O runtime Transformers.js (Apache 2.0) e ONNX Runtime Web (MIT) são construídos a partir de dependências fixadas no lockfile, com licenças no diretório gerado `docs/vendor/vision-4.3.2/`. Os pesos são obtidos do repositório público do modelo, com a licença/fonte indicadas na respetiva página.
 
 ```sh
-supabase functions delete recognize-food
+ONNXRUNTIME_NODE_INSTALL=skip npm ci
+npm run build:vision
+npm test
+FOODSTOCK_BROWSER=/usr/bin/chromium npm run test:browser
+# Integração com pesos reais: usa Internet e pode descarregar centenas de MB.
+FOODSTOCK_BROWSER=/usr/bin/chromium npm run test:vision:real
 ```
 
-A aplicação atual nunca a chama. Não é necessário configurar funções de visão nem secrets de fornecedores.
+`ONNXRUNTIME_NODE_INSTALL=skip` é a opção suportada pelo pacote para não descarregar componentes nativos/CUDA desnecessários. A aplicação usa o runtime do navegador; não desativa a verificação de integridade npm nem TLS. `docs/vendor/` é gerado e ignorado pelo Git. O workflow Pages executa o build antes de publicar.
+
+As validações distinguem domínio/privacidade/cancelamento, UI com fronteira do modelo simulada, runtime Web/WASM real com um grafo ONNX pequeno e integração com pesos reais numa fotografia pública de fruta, sem referências. O teste real também verifica reabertura offline e que só pedidos públicos de ficheiros/metadados saem do navegador. As fotos de teste não são pessoais nem dados de treino, e não demonstram precisão para todas as despensas.
 
 ## Compras, estatísticas e modo offline
 
@@ -95,23 +97,26 @@ A aplicação atual nunca a chama. Não é necessário configurar funções de v
 
 ## Desenvolvimento e testes
 
-Sem Java, basta servir `docs/`:
+Sem Java, instala as dependências, constrói o runtime e serve `docs/`:
 
 ```sh
+ONNXRUNTIME_NODE_INSTALL=skip npm ci
+npm run build:vision
 python3 -m http.server 4173 --directory docs
 ```
 
 Abre `http://localhost:4173`. Podes usar a cópia local offline; a sincronização usa o projeto definido em `docs/config.mjs` e a tua conta FoodStock. Não há campos para configurar o fornecedor na aplicação.
 
 ```sh
-npm ci
+ONNXRUNTIME_NODE_INSTALL=skip npm ci
+npm run build:vision
 npm test
 FOODSTOCK_BROWSER=/usr/bin/chromium npm run test:browser
 ```
 
 No macOS, `FOODSTOCK_BROWSER` pode apontar para `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`.
 
-Os testes executam o modelo offline, a migração/RPCs/RLS em PostgreSQL local via PGlite e o motor de visão local com fotografias públicas de teste e imagens sintéticas. O teste Chromium usa um perfil e uma base temporários: verifica migração, autenticação, renovação de sessão, isolamento entre contas, fila/reinício/reenvio, confirmação de compras, revisão de fotografia e sete larguras de ecrã. Não usa fotos pessoais ou fornecedores de IA; não garante precisão para imagens arbitrárias nem substitui uma verificação final num projeto Supabase real.
+Os testes executam o modelo offline, a migração/RPCs/RLS em PostgreSQL local via PGlite e o pós-processamento do modelo e o controlo do worker. O runtime real e os pesos reais têm testes de integração separados. O teste Chromium usa um perfil e uma base temporários: verifica migração, autenticação, renovação de sessão, isolamento entre contas, fila/reinício/reenvio, confirmação de compras, revisão de fotografia e sete larguras de ecrã. Não usa fotos pessoais nem serviços de inferência remota; não garante precisão para imagens arbitrárias nem substitui uma verificação final num projeto Supabase real.
 
 O GitHub Actions executa os testes e checks; o workflow Pages publica exclusivamente `docs/`. `backend/` permanece apenas para migração/exportação da versão antiga, fora da aplicação ativa.
 

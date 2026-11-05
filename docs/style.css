@@ -3,8 +3,8 @@
  * axes: dark/grotesk-sans/cool · posture: restrained · contrast: pass (six views rendered) · v2.0.0 */
 /* Hallmark · pre-emit critique: P4 H4 E4 S5 R5 V4 · weakest: H, compacted the shopping rows and kept sync status separate from save confirmation */
 /* Hallmark · reworded "Atualizar dados" to "Sincronizar" · the primary control now sends the durable browser queue to the API */
-@import url('./tokens.css?v=20261103.2');
-@import url('./base.css?v=20261103.2');
+@import url('./tokens.css?v=20261104.1');
+@import url('./base.css?v=20261104.1');
 @font-face { font-family: 'Host Grotesk'; src: url('./fonts/host-grotesk.ttf') format('truetype'); font-weight: 400 600; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Atkinson Hyperlegible Mono'; src: url('./fonts/atkinson-mono.ttf') format('truetype'); font-weight: 400 500; font-style: normal; font-display: swap; }
 html { background: var(--color-paper-3); }
@@ -234,13 +234,4 @@ input[type=file] { width:100%;max-width:100%;white-space:normal; }
 .photo-inputs label { min-width:0; }
 #photo-review .checkout-line { margin-block:var(--space-lg); }
 
-#visual-catalog { margin-block:var(--space-lg); }
-#visual-catalog > summary { min-height:44px;cursor:pointer;color:var(--color-accent); }
-#reference-crop { touch-action:none;cursor:crosshair; }
-#reference-status { margin-block:var(--space-md);color:var(--color-muted);font-size:var(--text-sm); }
-.reference-list { list-style:none;padding:0;margin-block:var(--space-lg); }
-.reference-list li { display:flex;align-items:center;gap:var(--space-md);flex-wrap:wrap;padding-block:var(--space-md);border-bottom:1px solid var(--color-rule); }
-.reference-list li > div { min-width:0;flex:1;overflow-wrap:anywhere; }
-.reference-list img { object-fit:contain;width:72px;height:72px;background:var(--color-paper-3);border-radius:var(--radius-pill); }
-.reference-list .hint { margin:0; }
-#reference-form > button { margin-block:var(--space-xs); }
+#photo-clear-model { margin-block:var(--space-md); }

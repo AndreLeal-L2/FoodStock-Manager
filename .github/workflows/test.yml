@@ -5,6 +5,8 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      ONNXRUNTIME_NODE_INSTALL: skip
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -12,7 +14,24 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
+      - run: npm run build:vision
       - run: npm run check
       - run: npm test
       - run: npx playwright install --with-deps chromium
       - run: FOODSTOCK_BROWSER=$(node -e "process.stdout.write(require('playwright').chromium.executablePath())") npm run test:browser
+
+  real-vision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ONNXRUNTIME_NODE_INSTALL: skip
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run build:vision
+      - run: npx playwright install --with-deps chromium
+      - run: FOODSTOCK_BROWSER=$(node -e "process.stdout.write(require('playwright').chromium.executablePath())") npm run test:vision:real

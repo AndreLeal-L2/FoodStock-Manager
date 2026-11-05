@@ -1,12 +1,12 @@
-import {runVision,readImage} from './vision-client.mjs?v=20261103.2';
-import {detectionsToItems} from './vision-catalog.mjs?v=20261103.2';
-import {VisualCatalog} from './visual-catalog-ui.mjs?v=20261103.2';
-import {photoDraft,captureData,categories} from './vision-model.mjs?v=20261103.2';
+import {VisionModelClient,readImage} from './vision-client.mjs?v=20261104.1';
+import {photoDraft,captureData,categories} from './vision-model.mjs?v=20261104.1';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export class Vision {
  constructor(getStore,notify,reload){
   Object.assign(this,{getStore,notify,reload,draft:null,busy:false,writes:Promise.resolve(),scope:null});
-  this.catalog=new VisualCatalog(getStore,notify,()=>this.busy);
+  this.model=new VisionModelClient();
+  document.querySelector('#photo-clear-model').addEventListener('click',()=>this.clearModel().catch(e=>notify(e.message)));
+  document.querySelector('#photo-manual').addEventListener('click',()=>this.manual().catch(e=>notify(e.message)));
   document.querySelector('#photo-cancel').addEventListener('click',()=>this.abort?.abort());
   this.panel=document.querySelector('#photo-review');this.preview=document.querySelector('#photo-preview');
   for(const input of document.querySelectorAll('[data-photo-input]'))input.addEventListener('change',()=>this.choose(input.files?.[0]).catch(e=>notify(e.message)).finally(()=>{input.value='';}));
@@ -25,43 +25,53 @@ export class Vision {
  }
  update(view){
   this.view=view;
-  if(this.scope!==view.profile.key){this.reset();this.scope=view.profile.key;}
+  if(this.scope!==view.profile.key){this.model.dispose();this.reset();this.scope=view.profile.key;}
   if(!this.draft&&view.profile.photoDraft){this.draft=structuredClone(view.profile.photoDraft);this.render();}
-  this.catalog.update(view);
-  document.querySelector('#photo-requirements').textContent=this.catalog.references.length?'A análise corre neste dispositivo e procura as embalagens cadastradas. Os resultados só entram no stock depois da tua revisão.':'Começa por cadastrar uma foto da frente de cada embalagem nas Referências visuais. O programa só reconhece padrões cadastrados; podes também adicionar itens manualmente.';
+  document.querySelector('#photo-requirements').textContent='Escolhe a foto e identifica os alimentos com IA local, sem cadastrar referências. Confirma sempre os resultados antes de guardar.';
  }
- reset(){this.generation=(this.generation||0)+1;clearTimeout(this.timer);this.abort?.abort();this.draft=null;this.image=null;this.busy=false;this.panel.innerHTML='';this.panel.hidden=true;this.preview.getContext('2d').clearRect(0,0,this.preview.width,this.preview.height);this.preview.hidden=true;document.querySelector('#photo-cancel').hidden=true;document.querySelector('#photo-analyze').disabled=true;document.querySelector('#photo-status').textContent='';}
+ reset(){this.generation=(this.generation||0)+1;clearTimeout(this.timer);this.abort?.abort();this.draft=null;this.image=null;this.busy=false;this.panel.innerHTML='';this.panel.hidden=true;this.preview.getContext('2d').clearRect(0,0,this.preview.width,this.preview.height);this.preview.hidden=true;document.querySelector('#photo-cancel').hidden=true;document.querySelector('#photo-clear-model').disabled=false;document.querySelector('#photo-analyze').disabled=true;document.querySelector('#photo-status').textContent='';}
  async choose(file){
   if(!file||this.busy)return;const store=this.getStore(),generation=(this.generation||0)+1;this.generation=generation;this.image=null;this.preview.hidden=true;const button=document.querySelector('#photo-analyze');button.disabled=true;
   const image=await readImage(file,1280);if(store!==this.getStore()||generation!==this.generation)return;this.image=image;this.preview.width=image.width;this.preview.height=image.height;this.preview.getContext('2d').drawImage(image,0,0);this.preview.hidden=false;button.disabled=false;document.querySelector('#photo-status').textContent='Fotografia preparada. Os píxeis são analisados apenas neste dispositivo.';
  }
 
  async analyze(){
-  if(this.busy||this.catalog.saving||!this.image)return;
+  if(this.busy||!this.image)return;
   if(this.scope!==this.getStore().key)throw Error('A conta mudou. Escolhe novamente a fotografia.');
-  if(!this.catalog.references.length)throw Error('Cadastra primeiro uma foto de referência das embalagens que queres reconhecer.');
   if(this.draft&&!confirm('Substituir o rascunho de reconhecimento atual? O stock ainda não foi alterado.'))return;
-  this.busy=true;this.abort=new AbortController();const button=document.querySelector('#photo-analyze'),cancel=document.querySelector('#photo-cancel'),store=this.getStore(),references=structuredClone(this.catalog.references);button.disabled=true;cancel.hidden=false;
-  document.querySelector('#photo-status').textContent='A procurar correspondências visuais neste dispositivo…';
+  this.busy=true;this.abort=new AbortController();const button=document.querySelector('#photo-analyze'),cancel=document.querySelector('#photo-cancel'),store=this.getStore();button.disabled=true;cancel.hidden=false;document.querySelector('#photo-clear-model').disabled=true;
+  document.querySelector('#photo-status').textContent='A preparar o reconhecimento local…';
   try{
-   const {detections}=await runVision('analyze',this.image.getContext('2d').getImageData(0,0,this.image.width,this.image.height),references,{signal:this.abort.signal,onProgress:({current,total})=>{if(store===this.getStore())document.querySelector('#photo-status').textContent=`A comparar embalagens: ${current} de ${total} referências.`;}});if(store!==this.getStore())return;
-   const draft=photoDraft(detectionsToItems(detections,references),(await store.view()).data.products);await store.savePhotoDraft(draft);this.draft=draft;this.render();this.drawDetections(detections,references);
-   document.querySelector('#photo-status').textContent=draft.items.length?`${detections.length} embalagem(ns) correspondente(s) a ${draft.items.length} alimento(s). Podem faltar itens: revê os nomes e a quantidade total em casa.`:'Não encontrei correspondências seguras. Usa uma foto mais próxima e de frente, cadastra novas referências ou adiciona os alimentos em falta manualmente.';
+   const result=await this.model.recognize(this.image.getContext('2d').getImageData(0,0,this.image.width,this.image.height),{signal:this.abort.signal,onProgress:progress=>{if(store===this.getStore())this.progress(progress);}});if(store!==this.getStore())return;
+   const draft=photoDraft(result.items,(await store.view()).data.products);await store.savePhotoDraft(draft);this.draft=draft;this.render();this.drawDetections(result.detections);
+   document.querySelector('#photo-status').textContent=draft.items.length?`${draft.items.length} alimento(s) sugerido(s) por IA local. Revê a identificação e as quantidades totais; podem faltar produtos.`:'O modelo não identificou alimentos com segurança. Tenta uma foto mais próxima ou adiciona os itens manualmente.';
    this.panel.scrollIntoView({block:'start',behavior:'instant'});
   }catch(error){if(store!==this.getStore())return;document.querySelector('#photo-status').textContent=error.name==='AbortError'?'Análise cancelada. O stock não foi alterado.':'A análise não foi concluída. O stock não foi alterado.';if(error.name!=='AbortError')throw error;}
-  finally{if(store===this.getStore()){this.busy=false;button.disabled=!this.image;cancel.hidden=true;}}
+  finally{if(store===this.getStore()){this.busy=false;button.disabled=!this.image;cancel.hidden=true;document.querySelector('#photo-clear-model').disabled=false;}}
  }
- drawDetections(detections,references){
+ drawDetections(detections){
   const ctx=this.preview.getContext('2d'),scale=this.image.width/Math.max(1,this.preview.getBoundingClientRect().width),size=Math.max(14,12*scale);ctx.drawImage(this.image,0,0);ctx.lineWidth=2*scale;ctx.font=`${size}px sans-serif`;
-  for(const detection of detections){const points=detection.polygon;ctx.strokeStyle='#76b3ff';ctx.beginPath();points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.closePath();ctx.stroke();const name=references.find(r=>r.id===detection.referenceId)?.name||'Embalagem',width=ctx.measureText(name).width+6*scale,x=Math.max(0,Math.min(this.image.width-width,points[0][0])),y=Math.max(size*1.4,points[0][1]);ctx.fillStyle='#0b111a';ctx.fillRect(x,y-size*1.4,width,size*1.4);ctx.fillStyle='#edf3fb';ctx.fillText(name,x+3*scale,y-size*.2);}
+  for(const detection of detections){const points=detection.polygon;ctx.strokeStyle='#76b3ff';ctx.beginPath();points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.closePath();ctx.stroke();const name=detection.name||'Alimento',width=ctx.measureText(name).width+6*scale,x=Math.max(0,Math.min(this.image.width-width,points[0][0])),y=Math.max(size*1.4,points[0][1]);ctx.fillStyle='#0b111a';ctx.fillRect(x,y-size*1.4,width,size*1.4);ctx.fillStyle='#edf3fb';ctx.fillText(name,x+3*scale,y-size*.2);}
  }
+
+ progress(progress){
+  const status=document.querySelector('#photo-status');
+  if(progress.stage==='runtime')status.textContent='A iniciar o motor local. Na primeira utilização pode ser necessário descarregar o modelo.';
+  else if(progress.stage==='download'){const mb=value=>(value/1048576).toFixed(1);status.textContent=progress.total>0?`A descarregar um ficheiro do modelo: ${mb(progress.loaded)} de ${mb(progress.total)} MB (${Math.round(progress.progress)}%). A foto fica neste dispositivo.`:'A obter os ficheiros do modelo local. A foto fica neste dispositivo.';}
+  else if(progress.stage==='fallback')status.textContent='A aceleração gráfica não está disponível para este modelo. A preparar execução local no processador…';
+  else if(progress.stage==='inference')status.textContent='A identificar os alimentos neste dispositivo. Podes cancelar; o stock mantém-se até confirmares.';
+  else if(progress.stage==='ready')status.textContent='Modelo pronto. A preparar a fotografia…';
+ }
+ async clearModel(){if(this.busy)return;if(!confirm('Libertar o espaço do modelo neste navegador? Os teus alimentos e compras ficam guardados. O próximo reconhecimento precisará de descarregar o modelo novamente.'))return;await this.model.clearModel();this.notify('Ficheiros do modelo removidos. O stock e as compras foram preservados.',true);}
+ async manual(){if(this.busy)return;if(this.draft&&!confirm('Substituir esta revisão por um registo manual? O stock ainda não foi alterado.'))return;const store=this.getStore(),draft=photoDraft([{name:'Novo alimento',category:'Outros',unit:null,quantity:null,brand:'',visibleCount:null,notes:''}],[]);await store.savePhotoDraft(draft);if(store!==this.getStore())return;this.draft=draft;this.render();this.panel.scrollIntoView({block:'start',behavior:'instant'});}
+
 
  render(){
   if(!this.draft)return;
   const products=this.view.data.products;
   this.panel.hidden=false;this.panel.innerHTML=`<h3>Rever os alimentos</h3><p class="hint">Uma foto não revela tudo. Confirma a quantidade total de cada alimento que tens em casa. Para um alimento existente, esta contagem substitui o stock anterior; não é uma compra e não cria gastos.</p>
    <form id="photo-review-form">${this.draft.items.map((line,index)=>`<fieldset class="checkout-line" data-photo-line="${index}"><legend>Alimento ${index+1}</legend>
-    ${line.visibleCount?`<p class="hint">Embalagens com correspondência visual: ${esc(line.visibleCount)}. Confirma o peso ou volume se usares kg ou L.</p>`:''}${line.notes?`<p class="hint">${esc(line.notes)}</p>`:''}
+    ${line.visibleCount?`<p class="hint">Embalagens sugeridas pelo modelo: ${esc(line.visibleCount)}. Confirma o peso ou volume se usares kg ou L.</p>`:''}${line.notes?`<p class="hint">${esc(line.notes)}</p>`:''}
     <label>Alimento na despensa<select name="productId"><option value="">Criar novo alimento</option>${products.map(p=>`<option value="${esc(p.id)}" ${p.id===line.productId?'selected':''}>${esc(p.name)} (${esc(p.unit)})</option>`).join('')}</select></label>
     <label>Nome<input name="name" maxlength="120" required value="${esc(line.name)}" ${line.productId?'disabled':''}></label>
     <div class="form-row"><label>Categoria<select name="category">${categories.map(c=>`<option ${line.category===c?'selected':''}>${esc(c)}</option>`).join('')}</select></label><label>Marca (opcional)<input name="brand" maxlength="120" value="${esc(line.brand)}"></label></div>
@@ -78,7 +88,8 @@ export class Vision {
  }
  collect(){if(!this.draft)return;for(const row of this.panel.querySelectorAll('[data-photo-line]')){const line=this.draft.items[Number(row.dataset.photoLine)];for(const name of ['productId','name','category','brand','unit','quantity'])line[name]=row.querySelector(`[name=${name}]`).value;}}
  persist(){clearTimeout(this.timer);if(!this.draft||this.busy)return this.writes;this.collect();const copy=structuredClone(this.draft),store=this.getStore();this.writes=this.writes.catch(()=>{}).then(()=>store.savePhotoDraft(copy));return this.writes;}
- async cancel(){if(!confirm('Cancelar esta revisão? O stock não será alterado.'))return;clearTimeout(this.timer);await this.writes.catch(()=>{});await this.getStore().clearPhotoDraft(this.draft.id);this.reset();}
+ async cancel(){if(!this.draft||this.busy)return;const store=this.getStore(),id=this.draft.id;if(!confirm('Cancelar esta revisão? O stock não será alterado.'))return;clearTimeout(this.timer);await this.writes.catch(()=>{});await store.clearPhotoDraft(id);if(store!==this.getStore())return;this.reset();}
+
  async submit(){
   if(this.busy)return;if(this.scope!==this.getStore().key)throw Error('A conta mudou. Abre novamente a revisão.');const form=this.panel.querySelector('form');if(!form.reportValidity())return;
   this.collect();if(!this.draft.items.length)throw Error('Adiciona pelo menos um alimento.');

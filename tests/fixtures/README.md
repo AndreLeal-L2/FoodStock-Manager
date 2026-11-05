@@ -1,12 +1,13 @@
-# Classical vision test images
+# Public photo fixture and UI test boundary
 
-`box.png` and `box-in-scene.png` come from OpenCV 4.12.0 sample data:
+`fruits.jpg` comes from OpenCV 4.12.0 sample data:
+https://github.com/opencv/opencv/blob/4.12.0/samples/data/fruits.jpg
 
-- https://github.com/opencv/opencv/blob/4.12.0/samples/data/box.png
-- https://github.com/opencv/opencv/blob/4.12.0/samples/data/box_in_scene.png
+OpenCV authors/contributors; Apache 2.0 licence in `OPENCV-LICENSE.txt`.
+It is an input to the real pre-trained model integration test, not a user reference,
+training image or evidence of accuracy on every pantry scene.
 
-OpenCV authors/contributors; Apache 2.0 licence included in `OPENCV-LICENSE.txt`.
-These are photographs of a textured planar object used to test viewpoint matching,
-not training data or evidence that the program semantically recognises all foods.
-The application does not include OpenCV as a runtime dependency; the vision engine
-is implemented in this repository. Browser food-label fixtures are generated in tests.
+`simulated-model-runtime.mjs` is a test double served only by the UI test server.
+It is never copied into the published application. Those UI tests validate review,
+cancellation, offline drafts and stock/sync contracts; they do not validate semantic
+model accuracy. `test:vision:real` uses the actual public weights separately.

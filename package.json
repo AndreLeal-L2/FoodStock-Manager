@@ -3,13 +3,19 @@
   "private": true,
   "scripts": {
     "test": "node tests/model.test.mjs && node tests/supabase.test.mjs && node tests/vision.test.mjs && node tests/auth.test.mjs",
-    "test:browser": "node tests/offline-browser.cjs && node tests/upgrade-browser.cjs",
-    "check": "node --check docs/app.js && node --check docs/store.mjs && node --check docs/model.mjs && node --check docs/cloud.mjs && node --check docs/checkout.mjs && node --check docs/vision.mjs && node --check docs/vision-model.mjs && node --check docs/sw.js && node --check docs/boot.js && node --check docs/vision-engine.mjs && node --check docs/vision-client.mjs && node --check docs/vision-worker.mjs && node --check docs/vision-catalog.mjs && node --check docs/visual-catalog-ui.mjs",
-    "release:client": "node scripts/release-client.mjs"
+    "test:browser": "node tests/offline-browser.cjs && node tests/upgrade-browser.cjs && node tests/runtime-browser.cjs",
+    "check": "node --check docs/app.js && node --check docs/store.mjs && node --check docs/model.mjs && node --check docs/cloud.mjs && node --check docs/checkout.mjs && node --check docs/vision.mjs && node --check docs/vision-model.mjs && node --check docs/sw.js && node --check docs/boot.js && node --check docs/vision-client.mjs && node --check docs/vision-ai-config.mjs && node --check docs/vision-ai-worker.mjs && node --check docs/vision-runtime.mjs && node --check docs/vision-results.mjs && node --check docs/food-labels.mjs && node --check docs/vision-model-files.mjs",
+    "release:client": "node scripts/release-client.mjs",
+    "build:vision": "node scripts/build-vision.mjs",
+    "test:runtime": "node tests/runtime-browser.cjs",
+    "test:vision:real": "node tests/real-vision-browser.cjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.3.14",
-    "playwright": "1.56.1",
-    "pngjs": "7.0.0"
+    "esbuild": "0.27.2",
+    "playwright": "1.56.1"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "4.3.2"
   }
 }

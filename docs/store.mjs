@@ -1,5 +1,4 @@
-import {validateCatalog,exportCatalog} from './vision-catalog.mjs?v=20261103.2';
-import { emptyData,project } from './model.mjs?v=20261103.2';
+import { emptyData,project } from './model.mjs?v=20261104.1';
 const DB_NAME='foodstock-offline-v1';
 const newProfile=key=>({key,instanceId:null,base:emptyData(),pending:[],lastSynced:null,lastError:null});
 let opening;
@@ -96,12 +95,6 @@ export class LocalStore extends EventTarget {
  async retry(){await access(this.key,p=>{if(p.pending[0])delete p.pending[0].error;return p;});this.changed();await this.sync();}
  async discard(id){await access(this.key,p=>{p.pending=p.pending.filter(op=>op.operationId!==id);return p;});this.changed();this.sync().catch(()=>this.changed(false));}
  async backup(){const view=await this.view();return {schemaVersion:3,exportedAt:new Date().toISOString(),source:'supabase',projectUrl:this.apiUrl,data:view.data,profile:view.profile};}
- async importReferences(catalog){
-  if(this.closed)throw Error('A conta mudou. Tenta novamente na conta original.');
-  const references=validateCatalog(catalog);
-  await access(this.key,p=>{const merged=new Map((p.visualReferences||[]).map(r=>[r.id,r]));for(const ref of references)merged.set(ref.id,ref);p.visualReferences=validateCatalog(exportCatalog([...merged.values()]));return p;});this.changed();
- }
- async removeReference(id){if(this.closed)throw Error('A conta mudou.');await access(this.key,p=>{p.visualReferences=(p.visualReferences||[]).filter(r=>r.id!==id);return p;});this.changed();}
  async savePhotoDraft(draft){await access(this.key,p=>{p.photoDraft=draft;return p;});}
  async clearPhotoDraft(id){await access(this.key,p=>{if(p.photoDraft?.id===id)p.photoDraft=null;return p;});}
  async importData(data){
