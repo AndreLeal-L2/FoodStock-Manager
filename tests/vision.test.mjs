@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {foodForLabel,FOOD_PROMPT} from '../docs/food-labels.mjs';
+import {foodForLabel,FOOD_PROMPT,FOOD_PROMPTS} from '../docs/food-labels.mjs';
 import {processPredictions} from '../docs/vision-results.mjs';
 import {resolveModelRevision} from '../docs/vision-model-files.mjs';
 import {LocalFoodRecognizer} from '../docs/vision-runtime.mjs';
@@ -22,12 +22,12 @@ test('separate boxes count visible packages, while physical inventory remains a 
 });
 function fakeLibrary({failGpuLoad=false,failGpuRun=false}={}){
  const calls={downloads:[],images:[],disposed:0};
- const processor=Object.assign(async(raw,prompt)=>{calls.images.push(raw);assert.ok(prompt.includes('rice.'));return {pixel_values:'private-in-memory',input_ids:[1]};},{image_processor:{size:{}},post_process_grounded_object_detection:()=>[{boxes:[[0,0,80,90]],labels:['rice'],scores:[.8]}]});
+ const processor=Object.assign(async(raw,prompt)=>{calls.images.push(raw);assert.ok(FOOD_PROMPTS.includes(prompt));return {pixel_values:'private-in-memory',input_ids:[1]};},{image_processor:{size:{}},post_process_grounded_object_detection:()=>[{boxes:[[0,0,80,90]],labels:['rice'],scores:[.8]}]});
  const library={env:{backends:{onnx:{wasm:{}}}},RawImage:class{constructor(data,width,height,channels){Object.assign(this,{data,width,height,channels});}},AutoProcessor:{from_pretrained:async(id,options)=>{calls.downloads.push({id,options});return processor;}},AutoModelForZeroShotObjectDetection:{from_pretrained:async(id,options)=>{calls.downloads.push({id,options});if(failGpuLoad&&options.device==='webgpu')throw Error('GPU unavailable');return Object.assign(async inputs=>{assert.equal(inputs.pixel_values,'private-in-memory');if(failGpuRun&&options.device==='webgpu')throw Error('GPU op unsupported');return {};},{dispose:async()=>calls.disposed++});}}};return {library,calls};
 }
 test('model adapter keeps pixels local, loads public weights once and reuses the prepared model',async()=>{
  const {library,calls}=fakeLibrary();let loads=0;const recognizer=new LocalFoodRecognizer({revisionResolver:async()=>'a'.repeat(40),libraryLoader:async()=>{loads++;return library;},gpu:null});
- assert.equal((await recognizer.recognize(image())).items[0].name,'Arroz');await recognizer.recognize(image());assert.equal(loads,1);assert.equal(calls.downloads.length,2);assert.equal(calls.images.length,2);assert.equal(calls.images[0].channels,4);assert.ok(calls.downloads.every(call=>!('image' in call.options)));assert.equal(library.env.backends.onnx.wasm.numThreads,1);assert.equal(library.env.useBrowserCache,true);await recognizer.dispose();assert.equal(calls.disposed,1);
+ assert.equal((await recognizer.recognize(image())).items[0].name,'Arroz');await recognizer.recognize(image());assert.equal(loads,1);assert.equal(calls.downloads.length,2);assert.equal(calls.images.length,2*FOOD_PROMPTS.length);assert.equal(calls.images[0].channels,4);assert.ok(calls.downloads.every(call=>!('image' in call.options)));assert.equal(library.env.backends.onnx.wasm.numThreads,1);assert.equal(library.env.useBrowserCache,true);await recognizer.dispose();assert.equal(calls.disposed,1);
 });
 test('GPU initialization and unsupported GPU operators both fall back to local CPU execution',async()=>{
  for(const key of ['failGpuLoad','failGpuRun']){const {library,calls}=fakeLibrary({[key]:true}),progress=[];const recognizer=new LocalFoodRecognizer({revisionResolver:async()=>'a'.repeat(40),libraryLoader:async()=>library,gpu:{requestAdapter:async()=>({})},onProgress:p=>progress.push(p)});const result=await recognizer.recognize(image());assert.equal(result.model.device,'wasm');assert.ok(progress.some(p=>p.stage==='fallback'));assert.ok(calls.downloads.some(call=>call.options.device==='wasm'));}

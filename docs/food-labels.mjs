@@ -30,7 +30,8 @@ const groups=[
  ]]
 ];
 export const FOODS=groups.flatMap(([category,items])=>items.map(([label,name,aliases])=>({label,name,category,aliases:[label,...aliases]})));
-export const FOOD_PROMPT=FOODS.map(food=>food.label+'.').join(' ');
+export const FOOD_PROMPTS=groups.map(([,items])=>items.map(([label])=>label+'.').join(' '));
+export const FOOD_PROMPT=FOOD_PROMPTS.join(' ');
 export const normalizeLabel=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 export function foodForLabel(label){
  const normalized=normalizeLabel(label),padded=' '+normalized+' ';
