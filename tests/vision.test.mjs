@@ -29,6 +29,12 @@ test('model adapter keeps pixels local, loads public weights once and reuses the
  const {library,calls}=fakeLibrary();let loads=0;const recognizer=new LocalFoodRecognizer({revisionResolver:async()=>'a'.repeat(40),libraryLoader:async()=>{loads++;return library;},gpu:null});
  assert.equal((await recognizer.recognize(image())).items[0].name,'Arroz');await recognizer.recognize(image());assert.equal(loads,1);assert.equal(calls.downloads.length,2);assert.equal(calls.images.length,2*FOOD_PROMPTS.length);assert.equal(calls.images[0].channels,4);assert.ok(calls.downloads.every(call=>!('image' in call.options)));assert.equal(library.env.backends.onnx.wasm.numThreads,1);assert.equal(library.env.useBrowserCache,true);await recognizer.dispose();assert.equal(calls.disposed,1);
 });
+test('cache-only loading avoids optional network files and a partial cache can resume downloading',async()=>{
+ const {library,calls}=fakeLibrary(),original=library.AutoProcessor.from_pretrained;let misses=0;
+ library.AutoProcessor.from_pretrained=async(id,options)=>{if(options.local_files_only){misses++;throw Error('required file missing from cache');}return original(id,options);};
+ const recognizer=new LocalFoodRecognizer({revisionResolver:async()=>'a'.repeat(40),libraryLoader:async()=>library,gpu:null});await recognizer.recognize(image());assert.equal(misses,1);assert.ok(calls.downloads.every(call=>call.options.local_files_only===false));
+ const cached=fakeLibrary(),offline=new LocalFoodRecognizer({revisionResolver:async()=>'a'.repeat(40),libraryLoader:async()=>cached.library,gpu:null});await offline.recognize(image());assert.ok(cached.calls.downloads.every(call=>call.options.local_files_only===true));
+});
 test('GPU initialization and unsupported GPU operators both fall back to local CPU execution',async()=>{
  for(const key of ['failGpuLoad','failGpuRun']){const {library,calls}=fakeLibrary({[key]:true}),progress=[];const recognizer=new LocalFoodRecognizer({revisionResolver:async()=>'a'.repeat(40),libraryLoader:async()=>library,gpu:{requestAdapter:async()=>({})},onProgress:p=>progress.push(p)});const result=await recognizer.recognize(image());assert.equal(result.model.device,'wasm');assert.ok(progress.some(p=>p.stage==='fallback'));assert.ok(calls.downloads.some(call=>call.options.device==='wasm'));}
 });
