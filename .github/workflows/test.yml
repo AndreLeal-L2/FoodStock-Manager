@@ -4,7 +4,7 @@ permissions:
   contents: read
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       ONNXRUNTIME_NODE_INSTALL: skip
     steps:
@@ -21,7 +21,7 @@ jobs:
       - run: FOODSTOCK_BROWSER=$(node -e "process.stdout.write(require('playwright').chromium.executablePath())") npm run test:browser
 
   real-vision:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       ONNXRUNTIME_NODE_INSTALL: skip
