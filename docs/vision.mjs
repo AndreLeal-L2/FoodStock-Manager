@@ -68,7 +68,6 @@ export class Vision {
   else if(progress.stage==='labels-unavailable')status.textContent='Não foi possível ler os rótulos. A tentar identificação visual local…';
   else if(progress.stage==='runtime')status.textContent='A iniciar a pesquisa visual. Na primeira utilização, o modelo pode ocupar centenas de MB; prefere Wi-Fi.';
   else if(progress.stage==='download'){const mb=value=>(value/1048576).toFixed(1);status.textContent=progress.total>0?`A descarregar um ficheiro do modelo: ${mb(progress.loaded)} de ${mb(progress.total)} MB (${Math.round(progress.progress)}%). A foto fica neste dispositivo.`:'A obter os ficheiros do modelo local. A foto fica neste dispositivo.';}
-  else if(progress.stage==='fallback')status.textContent='A aceleração gráfica não está disponível para este modelo. A preparar execução local no processador…';
   else if(progress.stage==='inference')status.textContent=`A identificar os alimentos neste dispositivo${progress.part?' — grupo '+progress.part+' de '+progress.total:''}. Podes cancelar; o stock mantém-se até confirmares.`;
   else if(progress.stage==='ready')status.textContent='Modelo pronto. A preparar a fotografia…';
  }

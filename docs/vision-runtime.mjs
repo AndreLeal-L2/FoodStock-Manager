@@ -13,10 +13,10 @@ export function configureLibrary(library){
  env.backends.onnx.wasm.wasmPaths={mjs:new URL(RUNTIME_PATH+'ort-wasm-simd-threaded.jsep.mjs',import.meta.url).href,wasm:new URL(RUNTIME_PATH+'ort-wasm-simd-threaded.jsep.wasm',import.meta.url).href};
 }
 export class LocalFoodRecognizer {
- constructor({libraryLoader=loadLibrary,onProgress=()=>{},gpu=globalThis.navigator?.gpu,revisionResolver=async()=>MODEL.revision}={}){Object.assign(this,{libraryLoader,onProgress,gpu,revisionResolver,device:null,model:null,processor:null,library:null});}
+ constructor({libraryLoader=loadLibrary,onProgress=()=>{},revisionResolver=async()=>MODEL.revision}={}){Object.assign(this,{libraryLoader,onProgress,revisionResolver,device:null,model:null,processor:null,library:null});}
  async prepare(){
   if(this.model)return;
-  if(globalThis.navigator?.deviceMemory&&navigator.deviceMemory<4)throw Error('Este dispositivo tem pouca memória para a análise visual. Usa a leitura de rótulos ou o Mac.');
+  if(globalThis.navigator?.deviceMemory&&navigator.deviceMemory<8)throw Error('Este dispositivo tem pouca memória para a análise visual. Usa a leitura de rótulos ou um computador com pelo menos 8 GB.');
   this.onProgress({stage:'runtime'});const revision=await this.revisionResolver();this.library=await this.libraryLoader({onProgress:this.onProgress});configureLibrary(this.library);
   // The upstream tokenizer existence probe drops its revision/options. Pin the URL
   // template too, so that probe reads the same immutable files from our cache.
@@ -27,10 +27,8 @@ export class LocalFoodRecognizer {
    // Transformers.js requires this flag even for its browser-cache-only mode.
    this.library.env.allowLocalModels=this.options.local_files_only;
    this.processor=await this.library.AutoProcessor.from_pretrained(MODEL.id,this.options);
-   let adapter;try{adapter=await this.gpu?.requestAdapter();}catch{}
-   this.device=adapter?'webgpu':'wasm';
-   try{this.model=await this.library.AutoModelForZeroShotObjectDetection.from_pretrained(MODEL.id,{...this.options,device:this.device});}
-   catch(error){if(this.device!=='webgpu')throw error;this.onProgress({stage:'fallback'});this.device='wasm';this.model=await this.library.AutoModelForZeroShotObjectDetection.from_pretrained(MODEL.id,{...this.options,device:'wasm'});}
+   this.device='wasm';
+   this.model=await this.library.AutoModelForZeroShotObjectDetection.from_pretrained(MODEL.id,{...this.options,device:this.device});
   };
   // Optional Hub files may be absent even after a complete download. Cache-only mode
   // returns null for them instead of attempting network requests during offline startup.
@@ -45,8 +43,7 @@ export class LocalFoodRecognizer {
   for(const [part,prompt] of FOOD_PROMPTS.entries()){
    this.onProgress({stage:'inference',device:this.device,part:part+1,total:FOOD_PROMPTS.length});
    const inputs={...this.processor.tokenizer(prompt,{padding:true,truncation:true,max_length:256}),...imageInputs};
-   let output;
-   try{output=await this.model(inputs);}catch(error){if(this.device!=='webgpu')throw error;await this.model.dispose?.();this.onProgress({stage:'fallback'});this.device='wasm';this.model=await this.library.AutoModelForZeroShotObjectDetection.from_pretrained(MODEL.id,{...this.options,device:'wasm'});output=await this.model(inputs);}
+   const output=await this.model(inputs);
    const result=this.processor.post_process_grounded_object_detection(output,inputs.input_ids,{box_threshold:MODEL.boxThreshold,text_threshold:MODEL.textThreshold,target_sizes:[[image.height,image.width]]})[0];
    if(!result||!Array.isArray(result.boxes)||!Array.isArray(result.labels)||!Array.isArray(result.scores)||result.boxes.length!==result.labels.length||result.boxes.length!==result.scores.length)throw Error('Resposta do modelo inválida.');
    predictions.push(...result.boxes.map((b,i)=>({label:result.labels[i],score:result.scores[i],box:{xmin:b[0],ymin:b[1],xmax:b[2],ymax:b[3]}})));
