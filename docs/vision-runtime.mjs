@@ -22,8 +22,10 @@ export class LocalFoodRecognizer {
   if(this.model)return;
   this.onProgress({stage:'runtime'});const revision=await this.revisionResolver();this.library=await this.libraryLoader({onProgress:this.onProgress});configureLibrary(this.library);
   const progress_callback=event=>{if(event.status==='progress')this.onProgress({stage:'download',file:String(event.file||'').split('/').pop(),loaded:Number(event.loaded)||0,total:Number(event.total)||0,progress:Number(event.progress)||0});else if(['initiate','download','done'].includes(event.status))this.onProgress({stage:'download',file:String(event.file||'').split('/').pop()});};
-  this.options={revision,dtype:MODEL.dtype,progress_callback,local_files_only:true};
+  this.options={revision,dtype:MODEL.dtype,progress_callback:null,local_files_only:true};
   const load=async()=>{
+   // Transformers.js requires this flag even for its browser-cache-only mode.
+   this.library.env.allowLocalModels=this.options.local_files_only;
    this.processor=await this.library.AutoProcessor.from_pretrained(MODEL.id,this.options);
    // A smaller image budget limits activation memory on phones. No picture leaves this worker.
    this.processor.image_processor.size={shortest_edge:480,longest_edge:640};
@@ -34,7 +36,7 @@ export class LocalFoodRecognizer {
   };
   // Optional Hub files may be absent even after a complete download. Cache-only mode
   // returns null for them instead of attempting network requests during offline startup.
-  try{await load();}catch(error){this.options={...this.options,local_files_only:false};await load();}
+  try{await load();}catch(error){this.options={...this.options,progress_callback,local_files_only:false};await load();}
   this.onProgress({stage:'ready',device:this.device});
  }
  async recognize(image){
