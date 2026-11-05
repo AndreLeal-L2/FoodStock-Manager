@@ -14,6 +14,6 @@ Tempos: mediana de nove amostras após aquecimento. As saídas completas das est
 
 São medições das operações isoladas, com dados sintéticos, e não da aplicação completa nem de um telemóvel físico. A contagem de preparação de píxeis é verificada pelo teste do adaptador; não representa uma aceleração de nove vezes da inferência neural.
 
-Validação: sintaxe, 31 testes de domínio/PostgreSQL/autenticação/visão e testes Chromium de modo offline, checkout, separação de contas, recuperação da cache e runtime ONNX/WASM aprovados. A integração com os pesos reais e a reabertura offline está pendente no CI desta revisão.
+Validação: sintaxe, 31 testes de domínio/PostgreSQL/autenticação/visão e testes Chromium de modo offline, checkout, separação de contas, recuperação da cache e runtime ONNX/WASM aprovados. A integração com os pesos reais e a reabertura offline foi [aprovada no CI](https://github.com/AndreLeal-L2/FoodStock-Manager/actions/runs/41949380924), com WASM numa thread. A fotografia pública produziu os mesmos nomes e pontuações da versão anterior; manteve também o falso positivo já documentado. Não houve upload da imagem.
 
 O reconhecimento continua experimental, com revisão obrigatória. Não foram alterados o esquema Supabase, as operações de stock/compra, o modelo visual ou os limiares de identificação. Não houve calibração nova de precisão ou medição em hardware móvel físico.
