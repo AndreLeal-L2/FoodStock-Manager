@@ -21,6 +21,9 @@ export class LocalFoodRecognizer {
  async prepare(){
   if(this.model)return;
   this.onProgress({stage:'runtime'});const revision=await this.revisionResolver();this.library=await this.libraryLoader({onProgress:this.onProgress});configureLibrary(this.library);
+  // The upstream tokenizer existence probe drops its revision/options. Pin the URL
+  // template too, so that probe reads the same immutable files from our cache.
+  this.library.env.remotePathTemplate='{model}/resolve/'+revision+'/';
   const progress_callback=event=>{if(event.status==='progress')this.onProgress({stage:'download',file:String(event.file||'').split('/').pop(),loaded:Number(event.loaded)||0,total:Number(event.total)||0,progress:Number(event.progress)||0});else if(['initiate','download','done'].includes(event.status))this.onProgress({stage:'download',file:String(event.file||'').split('/').pop()});};
   this.options={revision,dtype:MODEL.dtype,progress_callback:null,local_files_only:true};
   const load=async()=>{

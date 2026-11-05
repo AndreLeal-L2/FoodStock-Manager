@@ -27,7 +27,7 @@ function fakeLibrary({failGpuLoad=false,failGpuRun=false}={}){
 }
 test('model adapter keeps pixels local, loads public weights once and reuses the prepared model',async()=>{
  const {library,calls}=fakeLibrary();let loads=0;const recognizer=new LocalFoodRecognizer({revisionResolver:async()=>'a'.repeat(40),libraryLoader:async()=>{loads++;return library;},gpu:null});
- assert.equal((await recognizer.recognize(image())).items[0].name,'Arroz');await recognizer.recognize(image());assert.equal(loads,1);assert.equal(calls.downloads.length,2);assert.equal(calls.images.length,2*FOOD_PROMPTS.length);assert.equal(calls.images[0].channels,4);assert.ok(calls.downloads.every(call=>!('image' in call.options)));assert.equal(library.env.backends.onnx.wasm.numThreads,1);assert.equal(library.env.useBrowserCache,true);await recognizer.dispose();assert.equal(calls.disposed,1);
+ assert.equal((await recognizer.recognize(image())).items[0].name,'Arroz');await recognizer.recognize(image());assert.equal(loads,1);assert.equal(calls.downloads.length,2);assert.equal(calls.images.length,2*FOOD_PROMPTS.length);assert.equal(calls.images[0].channels,4);assert.ok(calls.downloads.every(call=>!('image' in call.options)));assert.equal(library.env.backends.onnx.wasm.numThreads,1);assert.equal(library.env.useBrowserCache,true);assert.equal(library.env.remotePathTemplate,'{model}/resolve/'+'a'.repeat(40)+'/');await recognizer.dispose();assert.equal(calls.disposed,1);
 });
 test('cache-only loading avoids optional network files and a partial cache can resume downloading',async()=>{
  const {library,calls}=fakeLibrary(),original=library.AutoProcessor.from_pretrained;let misses=0;
