@@ -10,3 +10,16 @@ await writeFile(new URL('ONNX-RUNTIME-LICENSE.txt',output),ortLicence);
 const pkg=JSON.parse(await readFile(new URL('node_modules/onnxruntime-web/package.json',root),'utf8'));
 await writeFile(new URL('versions.json',output),JSON.stringify({transformers:'4.3.2',onnxruntime:pkg.version},null,2)+'\n');
 console.log('Browser vision runtime built in docs/vendor/vision-4.3.2 (weights download separately on first analysis).');
+const labels=new URL('docs/vendor/labels-7.0.0/',root);
+await mkdir(labels,{recursive:true});
+await build({entryPoints:[new URL('./ocr-entry.mjs',import.meta.url).pathname],bundle:true,format:'esm',platform:'browser',target:['chrome113','safari17'],minify:true,legalComments:'linked',outfile:new URL('ocr.mjs',labels).pathname});
+await copyFile(new URL('node_modules/tesseract.js/dist/worker.min.js',root),new URL('worker.min.js',labels));
+for(const variant of ['lstm','simd-lstm','relaxedsimd-lstm'])for(const extension of ['wasm.js','wasm']){
+ const file=`tesseract-core-${variant}.${extension}`;
+ await copyFile(new URL('node_modules/tesseract.js-core/'+file,root),new URL(file,labels));
+}
+for(const language of ['por','eng'])await copyFile(new URL(`node_modules/@tesseract.js-data/${language}/4.0.0_best_int/${language}.traineddata.gz`,root),new URL(language+'.traineddata.gz',labels));
+await copyFile(new URL('node_modules/tesseract.js/LICENSE.md',root),new URL('TESSERACT-LICENSE.txt',labels));
+await copyFile(new URL('node_modules/tesseract.js-core/LICENSE',root),new URL('CORE-LICENSE.txt',labels));
+await writeFile(new URL('LANGUAGES-NOTICE.txt',labels),`Portuguese and English traineddata: @tesseract.js-data/por and @tesseract.js-data/eng 1.0.0.\nSource: https://github.com/naptha/tessdata ; upstream: https://github.com/tesseract-ocr/tessdata_best\nLanguage npm packages declare MIT; upstream Tesseract traineddata is Apache-2.0 (see TESSERACT-LICENSE.txt).\n\nMIT License\nCopyright (c) Balearica, Jerome Wu and contributors\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\n`);
+console.log('Local label reader built in docs/vendor/labels-7.0.0 (Portuguese + English, no external downloads at runtime).');

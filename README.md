@@ -4,7 +4,7 @@ Despensa, lista de compras, gastos e preços. Front-end estático no **GitHub Pa
 
 Site: **https://andreleal-l2.github.io/FoodStock-Manager/**
 
-A aplicação funciona offline com IndexedDB e uma fila persistente. O projeto Supabase do FoodStock já está definido em `docs/config.mjs`, com o URL e a chave pública fornecidos pelo responsável. A aplicação mostra apenas a conta FoodStock (email/palavra-passe); não pede configuração do fornecedor aos utilizadores. Credenciais administrativas ficam fora do site. A identificação por fotografia usa um modelo visual aberto, executado no dispositivo, sem cadastro de referências, OpenAI ou API paga de reconhecimento. Na primeira utilização é necessário descarregar o modelo; a revisão humana continua obrigatória.
+A aplicação funciona offline com IndexedDB e uma fila persistente. O projeto Supabase do FoodStock já está definido em `docs/config.mjs`, com o URL e a chave pública fornecidos pelo responsável. A aplicação mostra apenas a conta FoodStock (email/palavra-passe); não pede configuração do fornecedor aos utilizadores. Credenciais administrativas ficam fora do site. A identificação por fotografia lê rótulos em português/inglês no dispositivo e oferece pesquisa visual opcional. Não exige referências pessoais, OpenAI ou API paga; a revisão humana continua obrigatória.
 
 ## Administração do Supabase
 
@@ -42,46 +42,50 @@ A autenticação e a aplicação da migração precisam de ser feitas por algué
 
 A cópia anterior deste navegador mantém-se separada, na chave `primary` do IndexedDB. Terminar sessão volta a essa cópia; não mistura dados entre contas. Os rascunhos anteriores mantêm-se nessa cópia original: conclui-os antes da migração ou retoma-os aí. Cada conta/projeto usa um perfil local separado. Os ficheiros H2 antigos continuam intactos; a aplicação nova não os lê diretamente. As instruções para exportar a API antiga estão em [backend/README.md](backend/README.md).
 
-## Identificação automática por fotografia
+## Identificação por fotografia
 
-Em **Despensa**, escolhe ou tira uma fotografia e toca em **Identificar produtos**. Não é necessário cadastrar imagens de referência, marcas ou alimentos antes de analisar. O modelo visual é **Grounding DINO Tiny**, convertido para ONNX em [onnx-community/grounding-dino-tiny-ONNX](https://huggingface.co/onnx-community/grounding-dino-tiny-ONNX), executado por Transformers.js/ONNX Runtime Web.
+Na **Despensa**, escolhe ou tira uma fotografia, com os alimentos separados e os rótulos voltados para a câmara. Há duas ações:
 
-### Primeira utilização e privacidade
+- **Ler rótulos**: lê nomes em português/inglês com Tesseract.js 7.0.0 e sugere alimentos como arroz, feijão, polpa de tomate e azeite. Mostra o texto que originou cada sugestão. O primeiro download é de cerca de 8 MB, servido pelo próprio site. Não inicia automaticamente o modelo visual grande, mesmo se não encontrar nomes.
+- **Procurar pela aparência**: usa Grounding DINO Tiny para alimentos sem rótulo legível. A primeira utilização pode descarregar centenas de MB e demorar vários minutos; prefere Wi-Fi e o Mac. Se já tens uma revisão da mesma fotografia, acrescenta sugestões novas e preserva os nomes, marcas, unidades e quantidades corrigidos. Uma fotografia nova exige confirmar a substituição da revisão anterior.
 
-- A primeira análise descarrega os ficheiros públicos do modelo e o runtime. O download pode ter centenas de MB e demorar vários minutos; usa Wi-Fi. Há progresso e cancelamento na interface.
-- Só são feitos pedidos de ficheiros/metadados públicos. A fotografia é descodificada no navegador e enviada como píxeis para um Web Worker local; não é enviada ao Hugging Face, Supabase, OpenAI ou outro serviço de reconhecimento.
-- A primeira revisão do modelo é fixada a um commit imutável do repositório público. Configuração, tokenizer e pesos usam essa mesma revisão, evitando misturar versões. A revisão e os ficheiros ficam na cache `foodstock-ai-model-v1`.
-- O vocabulário é analisado em grupos curtos por categoria, para reduzir interferência entre nomes; a interface mostra o progresso. O modelo preparado é reutilizado entre grupos e entre fotos. Aceleração WebGPU é tentada quando disponível; falhas de inicialização/operações gráficas usam o processador via WASM. O runtime usa uma thread para funcionar no GitHub Pages sem cabeçalhos COOP/COEP.
-- O desempenho e a memória dependem do dispositivo. Navegadores que reportem menos de 4 GB não iniciam o modelo; recomenda-se experimentar no Mac. Falta de memória, suporte do navegador ou download incompleto podem impedir a análise. O stock/manual mantém-se disponível.
-- Depois de o download/cache terminar, a reabertura e o reconhecimento podem funcionar sem rede. Uma cache parcial, removida ou indisponível precisa de Internet novamente. O navegador pode remover ficheiros por pressão de armazenamento.
-- **Libertar espaço do modelo** termina o worker e remove apenas os ficheiros públicos desse modelo. Mantém alimentos, compras, sessão, rascunhos e alterações por enviar. O próximo reconhecimento volta a descarregar o modelo.
+Não é necessário cadastrar referências, marcas ou alimentos antes de analisar. Escolher uma foto mantém o stock inalterado. O original não é enviado para reconhecimento nem guardado na base/cache; apenas as sugestões/revisão ficam no perfil local. As imagens são descodificadas no navegador e processadas em workers. Nem OpenAI nem outros serviços recebem os píxeis. Só saem os pedidos dos ficheiros públicos e a sincronização habitual dos dados confirmados.
 
 ### Rever e guardar
 
-1. O modelo procura alimentos comuns usando o vocabulário interno em `food-labels.mjs`. Não pede referências pessoais. Uma identificação continua a ser uma sugestão: embalagens fechadas, rótulos pouco visíveis, produtos fora do vocabulário, sobreposição e desfocagem podem produzir erros ou omissões.
-2. As caixas sugeridas são marcadas na foto. As categorias vêm da correspondência com os nomes de alimentos; marcas ilegíveis não são inventadas. A contagem é apenas de objetos/embalagens detetados, não de kg/litros, conteúdo restante ou peças ocultas.
-3. Revê os nomes/categorias, associa a um alimento existente ou cria outro, remove erros e adiciona o que falta. Peso/volume/preço não são inferidos. **Adicionar manualmente** funciona mesmo sem modelo ou foto.
-4. Confirma a **quantidade total em casa**. Para um alimento existente, substitui o stock anterior. A confirmação não cria despesas; compras/preços continuam em Compras/Finalizar compras.
-5. A revisão e a confirmação são guardadas no navegador; o stock confirmado sincroniza com a conta. Uma contagem em conflito com alterações noutro dispositivo continua preservada para resolução.
+1. Confere o nome, a categoria e a origem: **Lido no rótulo** ou **Identificação pela aparência**. Remove erros e adiciona os alimentos em falta. As caixas de rótulos marcam texto, não delimitam embalagens.
+2. Associa a um alimento existente ou cria um novo. A marca é opcional. A leitura tenta ignorar ingredientes, informação nutricional e frases como “sem leite”; não garante compreender todas as disposições de uma embalagem.
+3. Indica a **quantidade total em casa** e a unidade. O texto “1 kg” não revela quanto resta; rótulos repetidos não são tratados como uma contagem de embalagens. Preço, peso restante e unidades não são inventados.
+4. Marca a revisão e confirma **Guardar contagem no stock**. Para um alimento existente, substitui o stock anterior. Não cria despesas; compras e preços continuam em Compras/Finalizar compras.
+5. Podes cancelar, retomar o rascunho após reload ou guardar offline. Uma alteração concorrente de stock exige nova revisão. O botão de pesquisa visual só fica disponível com a fotografia aberta; após reload é necessário escolher uma foto novamente.
 
-O sistema anterior de referências deixou de fazer parte da interface. Os dados antigos, se existirem no perfil local, não são apagados e continuam no backup JSON. Não é necessária nova migração SQL nem nenhuma chave de IA/Edge Function de visão.
+### Downloads, memória e modo offline
 
-### Código, distribuição e validação
+- O OCR usa os modelos abertos de português e inglês, construídos com as dependências e servidos em `docs/vendor/labels-7.0.0/`. O motor é terminado após cada leitura para libertar memória; o modelo visual pode permanecer preparado entre pesquisas.
+- O visual usa [onnx-community/grounding-dino-tiny-ONNX](https://huggingface.co/onnx-community/grounding-dino-tiny-ONNX), revisão fixa `ff690b0a8050566c290287545bd059350f3e9096`, Transformers.js e ONNX Runtime Web. Tokenizer, configuração e pesos são da mesma revisão, incluindo pesquisas internas da biblioteca. Não é necessário consultar a API de metadados para descobrir outra versão.
+- A imagem é preparada uma vez por pesquisa e os nomes são analisados em grupos curtos. O visual rejeita propostas abaixo de 0,30 e não tenta distinguir pela textura pós como sal/farinha/temperos: nesses casos, precisa do nome no rótulo. A pontuação do modelo não é uma probabilidade calibrada de acerto.
+- A aceleração WebGPU é tentada quando disponível; há fallback para WASM numa thread, compatível com Pages sem COOP/COEP. Navegadores que reportem menos de 4 GB são impedidos de iniciar o modelo visual. Essa restrição não bloqueia a leitura de rótulos.
+- Depois do primeiro download completo, os ficheiros podem ser reutilizados offline. Uma cache parcial, removida pelo navegador, armazenamento indisponível ou falta de memória podem impedir a identificação. O registo manual continua disponível.
+- **Libertar espaço dos modelos** termina a análise e remove apenas a cache pública `foodstock-ai-model-v1`. Mantém stock, compras, sessões, rascunhos e alterações por enviar. O próximo uso precisa de descarregar os ficheiros novamente. A cache Tesseract em IndexedDB foi desativada; os ficheiros públicos usam a mesma cache da aplicação.
 
-O modelo é de terceiros e pré-treinado; o projeto não alega tê-lo treinado ou inventado. O runtime Transformers.js (Apache 2.0) e ONNX Runtime Web (MIT) são construídos a partir de dependências fixadas no lockfile, com licenças no diretório gerado `docs/vendor/vision-4.3.2/`. Os pesos são obtidos do repositório público do modelo, com a licença/fonte indicadas na respetiva página.
+### Distribuição e validação
+
+Tesseract.js/core são Apache 2.0; os pacotes de idiomas declaram MIT e os dados de treino têm origem em tessdata. Transformers.js é Apache 2.0 e ONNX Runtime Web é MIT. Licenças e atribuições acompanham os ficheiros gerados. São motores/modelos de terceiros; o projeto não alega tê-los treinado ou inventado. Não são instalados hooks nem enviados dados para treino. Não é necessária nova migração SQL nem nenhuma chave de IA.
 
 ```sh
 ONNXRUNTIME_NODE_INSTALL=skip npm ci
 npm run build:vision
 npm test
 FOODSTOCK_BROWSER=/usr/bin/chromium npm run test:browser
-# Integração com pesos reais: usa Internet e pode descarregar centenas de MB.
+# Visão com pesos reais: usa Internet e pode descarregar centenas de MB.
 FOODSTOCK_BROWSER=/usr/bin/chromium npm run test:vision:real
 ```
 
-`ONNXRUNTIME_NODE_INSTALL=skip` é a opção suportada pelo pacote para não descarregar componentes nativos/CUDA desnecessários. A aplicação usa o runtime do navegador; não desativa a verificação de integridade npm nem TLS. `docs/vendor/` é gerado e ignorado pelo Git. O workflow Pages executa o build antes de publicar.
+`ONNXRUNTIME_NODE_INSTALL=skip` evita os componentes nativos/CUDA desnecessários; integridade npm e TLS permanecem ativos. O build inclui ambos os motores e os dois idiomas. `docs/vendor/` é gerado, ignorado pelo Git e construído no workflow Pages.
 
-As validações distinguem domínio/privacidade/cancelamento, UI com fronteira do modelo simulada, runtime Web/WASM real com um grafo ONNX pequeno e integração com pesos reais numa fotografia pública de fruta, sem referências. O teste real também verifica reabertura offline e que só pedidos públicos de ficheiros/metadados saem do navegador. As fotos de teste não são pessoais nem dados de treino, e não demonstram precisão para todas as despensas. Na validação atual, o modelo identificou banana e também sugeriu sal incorretamente na mesma fotografia. É uma versão experimental; ainda não foi medida a precisão com embalagens de arroz/feijão nem em dispositivos móveis físicos. A revisão humana é obrigatória.
+Validação local: 37 testes de domínio/PostgreSQL/autenticação/visão/rótulos e testes de navegador. O OCR/WASM real lê quatro rótulos portugueses sintéticos, repete após reload offline, rejeita exemplos de ingredientes/ausência e abre a revisão real com quantidades obrigatórias, sem pedidos externos. A suite de UI usa motores simulados para verificar cancelamento, adição de sugestões, preservação de correções, limites e sincronização; não demonstra precisão. A visão real tem um teste separado com a fotografia pública de fruta, sem referências, agora exigindo pelo menos dois alimentos presentes e rejeitando alimentos ausentes. A validação dessa nova revisão visual está pendente no CI.
+
+Continua a ser uma versão experimental. Não há medição de precisão numa despensa real do utilizador nem em telemóveis físicos. Reflexos, texto pequeno ou inclinado, oclusão, ingredientes noutras regiões e produtos fora do vocabulário podem causar erros ou omissões. A revisão é obrigatória e nunca se grava stock só porque foi detetado um nome.
 
 ## Compras, estatísticas e modo offline
 

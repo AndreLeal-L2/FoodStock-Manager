@@ -1,3 +1,4 @@
+import {normalizeLabel} from './food-labels.mjs?v=20261105.3';
 export const categories=['Proteínas','Hidratos e acompanhamentos','Legumes','Fruta','Laticínios','Conservas e leguminosas','Bebidas','Lanche','Temperos','Outros'];
 export function photoDraft(items,products){
  if(!Array.isArray(items)||items.length>60)throw Error('Resposta de reconhecimento inválida.');
@@ -12,3 +13,8 @@ export function photoDraft(items,products){
  })};
 }
 export function captureData(draft){return {items:draft.items.map(i=>({productId:i.productId||i.newProductId,quantity:Number(i.quantity),expectedStock:i.expectedStock,category:i.category,brand:i.brand.trim(),newProduct:i.productId?null:{name:i.name.trim(),unit:i.unit,category:i.category,brand:i.brand.trim()}}))};}
+export function appendPhotoDraft(draft,items,products){
+ const extra=photoDraft(items,products).items.filter(line=>!draft.items.some(current=>(line.productId&&current.productId===line.productId)||normalizeLabel(current.name)===normalizeLabel(line.name)));
+ if(draft.items.length+extra.length>60)throw Error('A revisão excederia 60 alimentos. Guarda ou reduz a revisão atual antes de acrescentar outros.');
+ return {...draft,items:[...draft.items,...extra]};
+}

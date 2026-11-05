@@ -1,5 +1,5 @@
-import {VisionModelClient,readImage} from './vision-client.mjs?v=20261105.2';
-import {photoDraft,captureData,categories} from './vision-model.mjs?v=20261105.2';
+import {VisionModelClient,readImage} from './vision-client.mjs?v=20261105.3';
+import {photoDraft,appendPhotoDraft,captureData,categories} from './vision-model.mjs?v=20261105.3';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export class Vision {
  constructor(getStore,notify,reload){
@@ -11,9 +11,10 @@ export class Vision {
   this.panel=document.querySelector('#photo-review');this.preview=document.querySelector('#photo-preview');
   for(const input of document.querySelectorAll('[data-photo-input]'))input.addEventListener('change',()=>this.choose(input.files?.[0]).catch(e=>notify(e.message)).finally(()=>{input.value='';}));
   document.querySelector('#photo-analyze').addEventListener('click',()=>this.analyze().catch(e=>notify(e.message)));
-  this.panel.addEventListener('input',()=>{if(this.busy||!this.draft)return;this.collect();clearTimeout(this.timer);this.timer=setTimeout(()=>this.persist().catch(e=>notify(e.message)),250);});
-  this.panel.addEventListener('change',e=>{if(this.busy||!this.draft)return;if(e.target.name==='productId')this.target(e.target);this.persist().catch(e=>notify(e.message));});
-  this.panel.addEventListener('focusout',()=>{if(this.draft&&!this.busy)this.persist().catch(e=>notify(e.message));});
+  document.querySelector('#photo-more').addEventListener('click',()=>this.analyze(true).catch(e=>notify(e.message)));
+  this.panel.addEventListener('input',()=>{if(this.busy||this.rendering||!this.draft)return;this.collect();clearTimeout(this.timer);this.timer=setTimeout(()=>this.persist().catch(e=>notify(e.message)),250);});
+  this.panel.addEventListener('change',e=>{if(this.busy||this.rendering||!this.draft)return;if(e.target.name==='productId')this.target(e.target);this.persist().catch(e=>notify(e.message));});
+  this.panel.addEventListener('focusout',()=>{if(this.draft&&!this.busy&&!this.rendering)this.persist().catch(e=>notify(e.message));});
   this.panel.addEventListener('submit',e=>{e.preventDefault();this.submit().catch(e=>notify(e.message));});
   this.panel.addEventListener('click',e=>{
    if(this.busy)return;
@@ -27,27 +28,34 @@ export class Vision {
   this.view=view;
   if(this.scope!==view.profile.key){this.model.dispose();this.reset();this.scope=view.profile.key;}
   if(!this.draft&&view.profile.photoDraft){this.draft=structuredClone(view.profile.photoDraft);this.render();}
-  document.querySelector('#photo-requirements').textContent='Escolhe a foto e identifica os alimentos com IA local, sem cadastrar referências. Confirma sempre os resultados antes de guardar.';
+  document.querySelector('#photo-requirements').textContent='Lê os nomes nos rótulos ou procura alimentos pela aparência. Tudo fica neste dispositivo. Revê sempre os resultados.';
  }
- reset(){for(const control of document.querySelectorAll('[data-photo-input],#photo-manual'))control.disabled=false;this.generation=(this.generation||0)+1;clearTimeout(this.timer);this.abort?.abort();this.draft=null;this.image=null;this.busy=false;this.panel.innerHTML='';this.panel.hidden=true;this.preview.getContext('2d').clearRect(0,0,this.preview.width,this.preview.height);this.preview.hidden=true;document.querySelector('#photo-cancel').hidden=true;document.querySelector('#photo-clear-model').disabled=false;document.querySelector('#photo-analyze').disabled=true;document.querySelector('#photo-status').textContent='';}
+ reset(){for(const control of document.querySelectorAll('[data-photo-input],#photo-manual,#photo-more'))control.disabled=false;this.generation=(this.generation||0)+1;clearTimeout(this.timer);this.abort?.abort();this.draft=null;this.draftImage=null;this.image=null;this.busy=false;this.panel.inert=false;this.panel.removeAttribute('aria-busy');this.panel.innerHTML='';this.panel.hidden=true;this.preview.getContext('2d').clearRect(0,0,this.preview.width,this.preview.height);this.preview.hidden=true;document.querySelector('#photo-more').hidden=true;document.querySelector('#photo-cancel').hidden=true;document.querySelector('#photo-clear-model').disabled=false;document.querySelector('#photo-analyze').disabled=true;document.querySelector('#photo-status').textContent='';}
  async choose(file){
   if(!file||this.busy)return;const store=this.getStore(),generation=(this.generation||0)+1;this.generation=generation;this.image=null;this.preview.hidden=true;const button=document.querySelector('#photo-analyze');button.disabled=true;
-  const image=await readImage(file,1280);if(store!==this.getStore()||generation!==this.generation)return;this.image=image;this.preview.width=image.width;this.preview.height=image.height;this.preview.getContext('2d').drawImage(image,0,0);this.preview.hidden=false;button.disabled=false;document.querySelector('#photo-status').textContent='Fotografia preparada. Os píxeis são analisados apenas neste dispositivo.';
+  document.querySelector('#photo-more').hidden=true;
+  const image=await readImage(file,1920);if(store!==this.getStore()||generation!==this.generation)return;this.image=image;this.preview.width=image.width;this.preview.height=image.height;this.preview.getContext('2d').drawImage(image,0,0);this.preview.hidden=false;button.disabled=false;document.querySelector('#photo-more').hidden=false;document.querySelector('#photo-status').textContent='Fotografia preparada. Os píxeis são analisados apenas neste dispositivo.';
  }
 
- async analyze(){
+ async analyze(visualOnly=false){
   if(this.busy||!this.image)return;
   if(this.scope!==this.getStore().key)throw Error('A conta mudou. Escolhe novamente a fotografia.');
-  if(this.draft&&!confirm('Substituir o rascunho de reconhecimento atual? O stock ainda não foi alterado.'))return;
-  this.busy=true;for(const control of document.querySelectorAll('[data-photo-input],#photo-manual'))control.disabled=true;this.abort=new AbortController();const button=document.querySelector('#photo-analyze'),cancel=document.querySelector('#photo-cancel'),store=this.getStore();button.disabled=true;cancel.hidden=false;document.querySelector('#photo-clear-model').disabled=true;
+  const append=visualOnly&&this.draft&&this.draftImage===this.image;
+  if(this.draft&&!append&&!confirm('Substituir o rascunho de reconhecimento atual? O stock ainda não foi alterado.'))return;
+  this.collect();const before=this.draft?structuredClone(this.draft):null,prior=append?before:null;
+  clearTimeout(this.timer);this.busy=true;this.panel.inert=true;this.panel.setAttribute('aria-busy','true');for(const control of document.querySelectorAll('[data-photo-input],#photo-manual,#photo-more'))control.disabled=true;this.abort=new AbortController();const button=document.querySelector('#photo-analyze'),cancel=document.querySelector('#photo-cancel'),store=this.getStore();button.disabled=true;cancel.hidden=false;document.querySelector('#photo-clear-model').disabled=true;
   document.querySelector('#photo-status').textContent='A preparar o reconhecimento local…';
   try{
-   const result=await this.model.recognize(this.image.getContext('2d').getImageData(0,0,this.image.width,this.image.height),{signal:this.abort.signal,onProgress:progress=>{if(store===this.getStore())this.progress(progress);}});if(store!==this.getStore())return;
-   const draft=photoDraft(result.items,(await store.view()).data.products);await store.savePhotoDraft(draft);this.draft=draft;this.render();this.drawDetections(result.detections);
-   document.querySelector('#photo-status').textContent=draft.items.length?`${draft.items.length} alimento(s) sugerido(s) por IA local. Revê a identificação e as quantidades totais; podem faltar produtos.`:'O modelo não identificou alimentos com segurança. Tenta uma foto mais próxima ou adiciona os itens manualmente.';
-   this.panel.scrollIntoView({block:'start',behavior:'instant'});
+   if(before){await this.writes.catch(()=>{});await store.savePhotoDraft(before);if(store!==this.getStore())return;}
+   const result=await this.model.recognize(this.image.getContext('2d').getImageData(0,0,this.image.width,this.image.height),{visualOnly,signal:this.abort.signal,onProgress:progress=>{if(store===this.getStore())this.progress(progress);}});if(store!==this.getStore())return;
+   const view=await store.view();if(store!==this.getStore())return;
+   const draft=prior?appendPhotoDraft(prior,result.items,view.data.products):photoDraft(result.items,view.data.products);
+   await store.savePhotoDraft(draft);if(store!==this.getStore())return;
+   this.draft=draft;this.draftImage=this.image;this.render();this.drawDetections(result.detections);document.querySelector('#photo-more').hidden=result.method!=='labels';
+   document.querySelector('#photo-status').textContent=draft.items.length?(result.method==='labels'?`${draft.items.length} alimento(s) encontrado(s) nos rótulos. Podem faltar produtos sem texto legível; usa a pesquisa visual se necessário.`:`${draft.items.length} alimento(s) na revisão. Revê os nomes e as quantidades totais; a identificação visual pode falhar.`):result.method==='labels'?'Não foram lidos alimentos nos rótulos. Tenta uma foto mais próxima ou usa a pesquisa pela aparência.':'Não foram identificados alimentos com segurança. Tenta uma foto mais próxima ou adiciona os itens manualmente.';
+   document.querySelector('#photo-results').scrollIntoView({block:'start',behavior:'instant'});
   }catch(error){if(store!==this.getStore())return;document.querySelector('#photo-status').textContent=error.name==='AbortError'?'Análise cancelada. O stock não foi alterado.':'A análise não foi concluída. O stock não foi alterado.';if(error.name!=='AbortError')throw error;}
-  finally{if(store===this.getStore()){this.busy=false;for(const control of document.querySelectorAll('[data-photo-input],#photo-manual'))control.disabled=false;button.disabled=!this.image;cancel.hidden=true;document.querySelector('#photo-clear-model').disabled=false;}}
+  finally{if(store===this.getStore()){this.busy=false;this.panel.inert=false;this.panel.removeAttribute('aria-busy');for(const control of document.querySelectorAll('[data-photo-input],#photo-manual,#photo-more'))control.disabled=false;button.disabled=!this.image;cancel.hidden=true;document.querySelector('#photo-clear-model').disabled=false;}}
  }
  drawDetections(detections){
   const ctx=this.preview.getContext('2d'),scale=this.image.width/Math.max(1,this.preview.getBoundingClientRect().width),size=Math.max(14,12*scale);ctx.drawImage(this.image,0,0);ctx.lineWidth=2*scale;ctx.font=`${size}px sans-serif`;
@@ -56,7 +64,9 @@ export class Vision {
 
  progress(progress){
   const status=document.querySelector('#photo-status');
-  if(progress.stage==='runtime')status.textContent='A iniciar o motor local. Na primeira utilização pode ser necessário descarregar o modelo.';
+  if(progress.stage==='labels')status.textContent='A ler os rótulos neste dispositivo. A foto não é enviada; podes cancelar.';
+  else if(progress.stage==='labels-unavailable')status.textContent='Não foi possível ler os rótulos. A tentar identificação visual local…';
+  else if(progress.stage==='runtime')status.textContent='A iniciar a pesquisa visual. Na primeira utilização, o modelo pode ocupar centenas de MB; prefere Wi-Fi.';
   else if(progress.stage==='download'){const mb=value=>(value/1048576).toFixed(1);status.textContent=progress.total>0?`A descarregar um ficheiro do modelo: ${mb(progress.loaded)} de ${mb(progress.total)} MB (${Math.round(progress.progress)}%). A foto fica neste dispositivo.`:'A obter os ficheiros do modelo local. A foto fica neste dispositivo.';}
   else if(progress.stage==='fallback')status.textContent='A aceleração gráfica não está disponível para este modelo. A preparar execução local no processador…';
   else if(progress.stage==='inference')status.textContent=`A identificar os alimentos neste dispositivo${progress.part?' — grupo '+progress.part+' de '+progress.total:''}. Podes cancelar; o stock mantém-se até confirmares.`;
@@ -69,16 +79,16 @@ export class Vision {
  render(){
   if(!this.draft)return;
   const products=this.view.data.products;
-  this.panel.hidden=false;this.panel.innerHTML=`<h3>Rever os alimentos</h3><p class="hint">Uma foto não revela tudo. Confirma a quantidade total de cada alimento que tens em casa. Para um alimento existente, esta contagem substitui o stock anterior; não é uma compra e não cria gastos.</p>
+  this.rendering=true;try{this.panel.hidden=false;this.panel.innerHTML=`<h3>Rever os alimentos</h3><p class="hint">Uma foto não revela tudo. Confirma a quantidade total de cada alimento que tens em casa. Para um alimento existente, esta contagem substitui o stock anterior; não é uma compra e não cria gastos.</p>
    <form id="photo-review-form">${this.draft.items.map((line,index)=>`<fieldset class="checkout-line" data-photo-line="${index}"><legend>Alimento ${index+1}</legend>
-    ${line.visibleCount?`<p class="hint">Embalagens sugeridas pelo modelo: ${esc(line.visibleCount)}. Confirma o peso ou volume se usares kg ou L.</p>`:''}${line.notes?`<p class="hint">${esc(line.notes)}</p>`:''}
+    ${line.visibleCount?`<p class="hint">Objetos visíveis sugeridos pela imagem: ${esc(line.visibleCount)}. Confirma o peso ou volume se usares kg ou L.</p>`:''}${line.notes?`<p class="hint">${esc(line.notes)}</p>`:''}
     <label>Alimento na despensa<select name="productId"><option value="">Criar novo alimento</option>${products.map(p=>`<option value="${esc(p.id)}" ${p.id===line.productId?'selected':''}>${esc(p.name)} (${esc(p.unit)})</option>`).join('')}</select></label>
     <label>Nome<input name="name" maxlength="120" required value="${esc(line.name)}" ${line.productId?'disabled':''}></label>
     <div class="form-row"><label>Categoria<select name="category">${categories.map(c=>`<option ${line.category===c?'selected':''}>${esc(c)}</option>`).join('')}</select></label><label>Marca (opcional)<input name="brand" maxlength="120" value="${esc(line.brand)}"></label></div>
     <div class="form-row"><label>Unidade<select name="unit" required ${line.productId?'disabled':''}><option value="">Escolher unidade</option>${['kg','L','un'].map(unit=>`<option ${line.unit===unit?'selected':''}>${unit}</option>`).join('')}</select></label><label>Quantidade total em casa<input name="quantity" type="number" min="0" max="999999999" step="0.001" required value="${esc(line.quantity)}"></label></div>
     <p class="hint" data-old-stock>${line.productId?`Stock anterior: ${esc(line.expectedStock)} ${esc(line.unit)}. Esta contagem substitui esse valor.`:'Novo alimento, sem preço de compra associado.'}</p><button type="button" class="secondary" data-photo-remove="${index}">Remover este item</button></fieldset>`).join('')}
     <div class="checkout-actions"><button type="button" class="secondary" data-photo-add>Adicionar item em falta</button><button type="button" class="secondary" data-photo-cancel>Cancelar revisão</button></div>
-    <label class="review-confirmation"><input name="reviewed" type="checkbox" required>Revi os alimentos, as unidades e as quantidades totais. Quero atualizar o stock com estes valores.</label><button type="submit" ${!this.draft.items.length?'disabled':''}>Guardar contagem no stock</button></form>`;
+    <label class="review-confirmation"><input name="reviewed" type="checkbox" required>Revi os alimentos, as unidades e as quantidades totais. Quero atualizar o stock com estes valores.</label><button type="submit" ${!this.draft.items.length?'disabled':''}>Guardar contagem no stock</button></form>`;}finally{this.rendering=false;}
  }
  target(select){
   const row=select.closest('[data-photo-line]'),line=this.draft.items[Number(row.dataset.photoLine)],p=this.view.data.products.find(p=>p.id===select.value);

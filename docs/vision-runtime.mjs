@@ -1,14 +1,10 @@
-import {resolveModelRevision} from './vision-model-files.mjs?v=20261105.2';
-import {MODEL,MODEL_CACHE,RUNTIME_PATH} from './vision-ai-config.mjs?v=20261105.2';
-import {FOOD_PROMPTS} from './food-labels.mjs?v=20261105.2';
-import {processPredictions} from './vision-results.mjs?v=20261105.2';
+import {cachePublicFiles} from './vision-model-files.mjs?v=20261105.3';
+import {MODEL,MODEL_CACHE,RUNTIME_PATH} from './vision-ai-config.mjs?v=20261105.3';
+import {FOOD_PROMPTS} from './food-labels.mjs?v=20261105.3';
+import {processPredictions} from './vision-results.mjs?v=20261105.3';
 export async function loadLibrary({onProgress=()=>{}}={}){
  // Persist lazy runtime files even if first use starts before the service worker claims the page.
- let cache;try{cache=await globalThis.caches?.open(MODEL_CACHE);}catch{}
- if(cache)for(const file of ['transformers.mjs','ort-wasm-simd-threaded.jsep.mjs','ort-wasm-simd-threaded.jsep.wasm']){
-  const url=new URL(RUNTIME_PATH+file,import.meta.url).href;if(await cache.match(url))continue;
-  onProgress({stage:'download',file});const response=await fetch(url,{credentials:'omit'});if(!response.ok)throw Error('Não foi possível carregar o runtime local.');await cache.put(url,response);
- }
+ await cachePublicFiles(['transformers.mjs','ort-wasm-simd-threaded.jsep.mjs','ort-wasm-simd-threaded.jsep.wasm'].map(file=>new URL(RUNTIME_PATH+file,import.meta.url).href),onProgress);
  return import(new URL(RUNTIME_PATH+'transformers.mjs',import.meta.url));
 }
 export function configureLibrary(library){
@@ -17,9 +13,10 @@ export function configureLibrary(library){
  env.backends.onnx.wasm.wasmPaths={mjs:new URL(RUNTIME_PATH+'ort-wasm-simd-threaded.jsep.mjs',import.meta.url).href,wasm:new URL(RUNTIME_PATH+'ort-wasm-simd-threaded.jsep.wasm',import.meta.url).href};
 }
 export class LocalFoodRecognizer {
- constructor({libraryLoader=loadLibrary,onProgress=()=>{},gpu=globalThis.navigator?.gpu,revisionResolver=resolveModelRevision}={}){Object.assign(this,{libraryLoader,onProgress,gpu,revisionResolver,device:null,model:null,processor:null,library:null});}
+ constructor({libraryLoader=loadLibrary,onProgress=()=>{},gpu=globalThis.navigator?.gpu,revisionResolver=async()=>MODEL.revision}={}){Object.assign(this,{libraryLoader,onProgress,gpu,revisionResolver,device:null,model:null,processor:null,library:null});}
  async prepare(){
   if(this.model)return;
+  if(globalThis.navigator?.deviceMemory&&navigator.deviceMemory<4)throw Error('Este dispositivo tem pouca memória para a análise visual. Usa a leitura de rótulos ou o Mac.');
   this.onProgress({stage:'runtime'});const revision=await this.revisionResolver();this.library=await this.libraryLoader({onProgress:this.onProgress});configureLibrary(this.library);
   // The upstream tokenizer existence probe drops its revision/options. Pin the URL
   // template too, so that probe reads the same immutable files from our cache.

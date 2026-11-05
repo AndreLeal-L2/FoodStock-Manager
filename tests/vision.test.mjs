@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {foodForLabel,FOOD_PROMPT,FOOD_PROMPTS} from '../docs/food-labels.mjs';
 import {processPredictions} from '../docs/vision-results.mjs';
-import {resolveModelRevision} from '../docs/vision-model-files.mjs';
+import {cachePublicFiles} from '../docs/vision-model-files.mjs';
 import {LocalFoodRecognizer} from '../docs/vision-runtime.mjs';
 import {VisionModelClient} from '../docs/vision-client.mjs';
 import {photoDraft,captureData} from '../docs/vision-model.mjs';
@@ -50,9 +50,10 @@ test('cancel and cache clearing terminate inference while preserving all stock/s
  const original=globalThis.caches,deleted=[];globalThis.caches={delete:async name=>deleted.push(name)};try{await client.clearModel();assert.deepEqual(deleted,['foodstock-ai-model-v1']);}finally{globalThis.caches=original;}
 });
 
-test('first model download pins a public immutable revision and can reopen without network',async()=>{
- const entries=new Map(),calls=[];const cache={match:async key=>entries.get(key)?.clone(),put:async(key,value)=>entries.set(key,value)},storage={open:async()=>cache};
- const revision=await resolveModelRevision({cacheStorage:storage,fetcher:async(url,options)=>{calls.push({url,options});return new Response(JSON.stringify({sha:'b'.repeat(40),private:false,gated:false}));}});assert.equal(revision,'b'.repeat(40));assert.equal(calls.length,1);assert.equal(calls[0].options.credentials,'omit');
- assert.equal(await resolveModelRevision({cacheStorage:storage,fetcher:async()=>{throw Error('offline');}}),revision);assert.equal(entries.size,1);
- await assert.rejects(resolveModelRevision({cacheStorage:null,fetcher:async()=>new Response(JSON.stringify({sha:'invalid'}))}),/download público/);
+test('public runtime assets are cached once and can be reused without network',async()=>{
+ const originalCache=globalThis.caches,originalFetch=globalThis.fetch,entries=new Map(),calls=[];
+ globalThis.caches={open:async name=>{assert.equal(name,'foodstock-ai-model-v1');return {match:async key=>entries.get(key)?.clone(),put:async(key,response)=>entries.set(key,response)};}};
+ globalThis.fetch=async(url,options)=>{calls.push({url,options});return new Response('public runtime');};
+ try{const urls=['https://example.test/runtime.mjs','https://example.test/weights.gz'];await cachePublicFiles(urls);assert.equal(calls.length,2);assert.ok(calls.every(call=>call.options.credentials==='omit'));globalThis.fetch=async()=>assert.fail('Cached files must not fetch again');await cachePublicFiles(urls);assert.equal(entries.size,2);}
+ finally{globalThis.caches=originalCache;globalThis.fetch=originalFetch;}
 });

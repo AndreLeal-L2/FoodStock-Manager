@@ -1,4 +1,4 @@
-import {foodForLabel} from './food-labels.mjs?v=20261105.2';
+import {foodForLabel} from './food-labels.mjs?v=20261105.3';
 function overlap(a,b){const intersection=Math.max(0,Math.min(a.xmax,b.xmax)-Math.max(a.xmin,b.xmin))*Math.max(0,Math.min(a.ymax,b.ymax)-Math.max(a.ymin,b.ymin));return intersection/Math.max(1,Math.min((a.xmax-a.xmin)*(a.ymax-a.ymin),(b.xmax-b.xmin)*(b.ymax-b.ymin)));}
 export function processPredictions(predictions,width,height,{threshold=.25}={}){
  if(!Array.isArray(predictions)||predictions.length>900||!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1)throw Error('O modelo devolveu uma resposta inválida.');
@@ -13,6 +13,6 @@ export function processPredictions(predictions,width,height,{threshold=.25}={}){
  candidates.sort((a,b)=>b.score-a.score);
  const detections=[];for(const candidate of candidates){if(!detections.some(other=>overlap(candidate.box,other.box)>.65))detections.push(candidate);if(detections.length>=60)break;}
  const groups=new Map();
- for(const detection of detections){if(!groups.has(detection.label))groups.set(detection.label,{name:detection.name,category:detection.category,brand:'',unit:null,quantity:null,visibleCount:0,notes:'Sugestão de IA local. Confirma a identificação, as embalagens em falta e a quantidade total; o modelo não sabe o peso nem o conteúdo restante.'});groups.get(detection.label).visibleCount++;}
+ for(const detection of detections){if(!groups.has(detection.label))groups.set(detection.label,{name:detection.name,category:detection.category,brand:'',unit:null,quantity:null,visibleCount:0,notes:'Identificação pela aparência. Pode estar errada: confirma o alimento, os itens em falta e a quantidade total. A imagem não mede o peso nem o conteúdo restante.'});groups.get(detection.label).visibleCount++;}
  return {items:[...groups.values()],detections:detections.map(({name,box,score})=>({name,score,box,polygon:[[box.xmin,box.ymin],[box.xmax,box.ymin],[box.xmax,box.ymax],[box.xmin,box.ymax]]}))};
 }

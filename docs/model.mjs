@@ -1,4 +1,4 @@
-import template from './shopping-template.mjs?v=20261105.2';
+import template from './shopping-template.mjs?v=20261105.3';
 export const emptyData=()=>({schemaVersion:3,products:[],purchases:[],movements:[],shoppingList:{templateImported:false,items:[]}});
 export const quantity=value=>Math.round(Number(value)*1000);
 export const cents=value=>Math.round(Number(value)*100);

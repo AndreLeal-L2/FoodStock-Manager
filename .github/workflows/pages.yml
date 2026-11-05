@@ -2,7 +2,7 @@ name: Front-end no GitHub Pages
 on:
   push:
     branches: [main]
-    paths: ['docs/**', 'scripts/build-vision.mjs', 'scripts/vision-entry.mjs', 'package.json', 'package-lock.json', '.github/workflows/pages.yml']
+    paths: ['docs/**', 'scripts/build-vision.mjs', 'scripts/vision-entry.mjs', 'scripts/ocr-entry.mjs', 'package.json', 'package-lock.json', '.github/workflows/pages.yml']
   workflow_dispatch:
 permissions:
   contents: read

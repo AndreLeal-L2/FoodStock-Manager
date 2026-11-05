@@ -7,8 +7,8 @@
   <meta name="description" content="Organiza os alimentos de casa, regista as compras e compara gastos e preços por unidade com dados privados sincronizados entre os teus dispositivos.">
   <title>FoodStock · A tua despensa, em dia</title>
   <link rel="preload" href="fonts/host-grotesk.ttf" as="font" type="font/ttf" crossorigin>
-  <link rel="stylesheet" href="style.css?v=20261105.2">
-  <script src="boot.js?v=20261105.2" defer></script>
+  <link rel="stylesheet" href="style.css?v=20261105.3">
+  <script src="boot.js?v=20261105.3" defer></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -47,10 +47,10 @@
         <p class="hint">Versão experimental. Fotografa os alimentos separados, com rótulos visíveis e boa luz. O modelo pode omitir produtos ou sugerir produtos que não estão na foto: vais rever os nomes, as categorias e as quantidades antes de guardar. A marca é opcional.</p>
         <div class="photo-inputs"><label>Escolher imagem<input data-photo-input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif"></label><label>Tirar fotografia<input data-photo-input type="file" accept="image/*" capture="environment"></label></div>
         <canvas id="photo-preview" class="photo-preview" role="img" aria-label="Fotografia e alimentos sugeridos pelo modelo" hidden></canvas><p id="photo-status" role="status"></p>
-        <div class="checkout-actions"><button id="photo-analyze" type="button" disabled>Identificar produtos</button><button id="photo-cancel" type="button" class="secondary" hidden>Cancelar análise</button><button id="photo-manual" type="button" class="secondary">Adicionar manualmente</button></div>
-        <p class="hint">Sem cadastro de referências. Usa um modelo de IA aberto e gratuito que corre no dispositivo, sem API paga de reconhecimento. A foto não é enviada para análise. Na primeira utilização é necessário descarregar os ficheiros do modelo — podem ocupar centenas de MB e demorar vários minutos. Prefere Wi-Fi. Depois de o download terminar, os ficheiros ficam guardados para reutilização; o reconhecimento offline depende de a cache estar completa e da capacidade do dispositivo.</p>
-        <button id="photo-clear-model" type="button" class="secondary">Libertar espaço do modelo</button>
-        <section id="photo-review" hidden aria-label="Revisão dos alimentos identificados"></section>
+        <div class="checkout-actions"><button id="photo-analyze" type="button" disabled>Ler rótulos</button><button id="photo-cancel" type="button" class="secondary" hidden>Cancelar análise</button><button id="photo-manual" type="button" class="secondary">Adicionar manualmente</button></div>
+        <p class="hint">A leitura de rótulos em português e inglês funciona no dispositivo e descarrega cerca de 8 MB na primeira utilização. A pesquisa pela aparência é opcional, pode ocupar centenas de MB e demorar vários minutos. Usa-a para alimentos sem texto legível ou para acrescentar os que faltam, preservando as tuas correções. Usa Wi-Fi na primeira utilização. Não há cadastro de referências, envio da foto nem API paga. Após o download completo, podes reutilizar os ficheiros sem Internet, conforme a capacidade do dispositivo.</p>
+        <button id="photo-clear-model" type="button" class="secondary">Libertar espaço dos modelos</button>
+        <div id="photo-results"><button id="photo-more" type="button" class="secondary" hidden>Procurar pela aparência</button><section id="photo-review" hidden aria-label="Revisão dos alimentos identificados"></section></div>
       </article>
       <div class="two-columns forms-grid">
         <article class="form-panel"><h2>Adicionar alimento</h2><p class="muted">Usa sempre a mesma unidade para este produto.</p>
