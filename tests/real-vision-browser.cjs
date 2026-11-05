@@ -2,22 +2,22 @@
 // Downloads can be hundreds of MB. This test never uses a personal photo/account.
 const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os'),startStatic=require('./helpers/static.cjs');
 function safe(text){return String(text).replace(/https?:\/\/[^\s)"'<>\\]+/g,url=>{try{const u=new URL(url);return u.origin+u.pathname;}catch{return '[URL]';}}).slice(0,3500);}
-// Calibration uses the real model. The normal quality assertions below remain mandatory.
-async function calibrateCaptions(page,encoded){
+// Temporary real-model comparison; the production quality gate stays unchanged.
+async function compareDetector(page,encoded){
  return page.evaluate(async encoded=>{
   const version=new URL(document.querySelector('script[src*="boot.js"]').src).search;
-  const {FOOD_PROMPTS}=await import('./food-labels.mjs'+version),{LocalFoodRecognizer}=await import('./vision-runtime.mjs'+version),{readImage}=await import('./vision-client.mjs'+version);
-  const bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0)),canvas=await readImage(new File([bytes],'fruits.jpg',{type:'image/jpeg'}),1280),image=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height),original=FOOD_PROMPTS.slice();
-  const singular={bananas:'banana',apples:'apple',oranges:'orange',lemons:'lemon',pears:'pear',potatoes:'potato',carrots:'carrot',mushrooms:'mushroom',onions:'onion',tomatoes:'tomato',eggs:'egg'};
-  const plain=original.map(prompt=>prompt.replace(/\b(bananas|apples|oranges|lemons|pears|potatoes|carrots|mushrooms|onions|tomatoes|eggs)\b/g,word=>singular[word]));
-  const forms={orange:['orange fruit','orange slice'],lemon:['lemon','lemon slice'],kiwi:['kiwi fruit','kiwi slice'],lime:['lime fruit'],cabbage:['cabbage','purple cabbage']};
-  const expanded=plain.map(prompt=>prompt.split('.').map(p=>p.trim()).filter(Boolean).flatMap(label=>forms[label]||[label]).map(label=>label+'.').join(' '));
-  const joint=expanded.filter((_,index)=>index!==3).map((prompt,index)=>index===2?prompt+' '+expanded[3]:prompt);
-  const variants=[['singular',plain],['forms',expanded],['context',expanded.map(prompt=>prompt+' fruit. vegetable. package. background.')],['joint-produce',joint]];
-  const model=new LocalFoodRecognizer(),results=[];
-  try{for(const [name,prompts] of variants){FOOD_PROMPTS.splice(0,FOOD_PROMPTS.length,...prompts);const start=performance.now(),result=await model.recognize(image);results.push({name,items:result.items.map(i=>i.name),seconds:Math.round((performance.now()-start)/1000),predictions:result.model.topPredictions});}}
-  finally{FOOD_PROMPTS.splice(0,FOOD_PROMPTS.length,...original);await model.dispose();}
-  return results;
+  const {loadLibrary,configureLibrary}=await import('./vision-runtime.mjs'+version),{FOODS,FOOD_PROMPTS}=await import('./food-labels.mjs'+version),{processPredictions}=await import('./vision-results.mjs'+version),{readImage}=await import('./vision-client.mjs'+version);
+  const id='Xenova/owlv2-base-patch16-ensemble',metadata=await (await fetch('https://huggingface.co/api/models/'+id)).json(),revision=metadata.sha;
+  if(!/^[a-f0-9]{40}$/.test(revision))throw Error('Invalid public model revision');
+  const library=await loadLibrary();configureLibrary(library);library.env.remotePathTemplate='{model}/resolve/'+revision+'/';
+  const options={revision,dtype:'q8',device:'wasm'},processor=await library.AutoProcessor.from_pretrained(id,options),model=await library.AutoModelForZeroShotObjectDetection.from_pretrained(id,options);
+  const labels=FOODS.filter(food=>FOOD_PROMPTS.some(prompt=>prompt.includes(food.label+'.'))).map(food=>food.label),bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0)),canvas=await readImage(new File([bytes],'fruits.jpg',{type:'image/jpeg'}),1280),image=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height),raw=new library.RawImage(image.data,image.width,image.height,4);
+  const start=performance.now();
+  try{
+   const inputs={...processor.tokenizer(labels.map(label=>'a photo of '+label),{padding:true,truncation:true}),...await processor.image_processor(raw)},output=await model(inputs),result=processor.image_processor.post_process_object_detection(output,.1,[[image.height,image.width]],true)[0];
+   const predictions=result.boxes.map((b,i)=>({label:labels[result.classes[i]],score:result.scores[i],box:{xmin:b[0],ymin:b[1],xmax:b[2],ymax:b[3]}})).sort((a,b)=>b.score-a.score);
+   return {id,revision,seconds:Math.round((performance.now()-start)/1000),items:processPredictions(predictions.slice(0,900),image.width,image.height,{threshold:.1}).items.map(item=>item.name),predictions:predictions.slice(0,12).map(({label,score})=>({label,score}))};
+  }finally{await model.dispose();}
  },encoded);
 }
 (async()=>{const site=await startStatic(),temp=await fs.mkdtemp(path.join(os.tmpdir(),'foodstock-real-ai-'));let context;const failedRequests=[];try{
@@ -26,7 +26,7 @@ async function calibrateCaptions(page,encoded){
  const run=()=>page.evaluate(async encoded=>{const version=new URL(document.querySelector('script[src*="boot.js"]').src).search;const {VisionModelClient,readImage}=await import('./vision-client.mjs'+version);const bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0)),canvas=await readImage(new File([bytes],'fruits.jpg',{type:'image/jpeg'}),1280),client=new VisionModelClient();let last='';try{return await client.recognize(canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height),{visualOnly:true,onProgress:p=>{const stage=p.stage+(p.part?':'+p.part+'/'+p.total:p.total?':'+Math.floor((p.progress||0)/10)*10:'');if(stage!==last){last=stage;console.log('MODEL_STAGE '+stage);}}});}catch(error){throw Error(error.message+' '+(error.detail||''));}finally{client.dispose();}},encoded);
  const result=await run();
  const visible=new Set(['Bananas','Laranjas','Limões','Lima','Kiwi','Couve']);
- if(result.items.filter(item=>visible.has(item.name)).length<2||result.items.some(item=>!visible.has(item.name))){const calibration=await calibrateCaptions(page,encoded);console.log('::notice title=Real caption calibration::'+JSON.stringify(calibration));}
+ if(result.items.filter(item=>visible.has(item.name)).length<2||result.items.some(item=>!visible.has(item.name))){const comparison=await compareDetector(page,encoded);console.log('::notice title=Real detector comparison::'+JSON.stringify(comparison));}
  assert.equal(result.method,'visual','The appearance action must use the visual model');
  assert.ok(result.items.filter(item=>visible.has(item.name)).length>=2,'The visual model must identify at least two actual foods; '+JSON.stringify({items:result.items.map(i=>i.name),model:result.model}));
  assert.ok(result.items.every(item=>visible.has(item.name)),'No salt, milk or other absent foods may be suggested for the fruit fixture; '+JSON.stringify({items:result.items.map(i=>i.name),model:result.model}));assert.ok(result.items.every(item=>item.quantity===null&&item.brand===''));assert.ok(outbound.every(r=>['GET','HEAD','OPTIONS'].includes(r.method)&&!r.body),'Only public file/metadata requests may leave the browser');
