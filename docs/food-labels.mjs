@@ -34,6 +34,7 @@ const labelOnly=new Set(['salt','black pepper','spices','flour','onion powder'])
 export const FOODS=groups.flatMap(([category,items])=>items.map(([label,name,aliases])=>({label,name,category,aliases:[label,name,...aliases]})));
 export const VISUAL_FOODS=FOODS.filter(food=>!labelOnly.has(food.label));
 // Alternate shapes and packaging descriptions share one food identity.
+// Closed cereal/sauce boxes need readable labels; generic box prompts confused them with produce crates.
 const visualDescriptions={
  'chicken':['raw chicken meat'],'ground beef':['minced meat'],'fish':['fish fillet'],
  'canned tuna':['tuna can'],'eggs':['egg','egg carton'],
@@ -43,9 +44,9 @@ const visualDescriptions={
  'bananas':['banana','peeled banana'],'apples':['apple'],'oranges':['orange','orange slice'],
  'lemons':['lemon','lemon slice'],'pears':['pear'],'kiwi':['kiwi fruit','kiwi slice'],
  'milk':['milk carton'],'yogurt':['yogurt carton','yogurt cup'],
- 'beans':['canned beans','bag of beans'],'tomato sauce':['tomato paste','carton of tomato sauce'],
+ 'beans':['canned beans','bag of beans'],
  'olive oil':['bottle of olive oil'],'juice':['juice carton'],'coffee':['bag of coffee'],
- 'bread':['sliced bread'],'cookies':['biscuits'],'breakfast cereal':['cereal box']
+ 'bread':['sliced bread'],'cookies':['biscuits']
 };
 // Non-food alternatives let the detector reject packaging instead of assigning a food to every object.
 export const VISUAL_QUERIES=[

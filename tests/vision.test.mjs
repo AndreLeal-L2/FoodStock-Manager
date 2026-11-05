@@ -64,7 +64,7 @@ test('public runtime assets are cached once and can be reused without network',a
 });
 
 test('visual descriptions map to canonical foods and reject non-food classes and indistinguishable powders',async()=>{
- assert.ok(VISUAL_QUERIES.length>VISUAL_FOODS.length);assert.equal(new Set(VISUAL_QUERIES.map(q=>q.text)).size,VISUAL_QUERIES.length);
+ assert.ok(VISUAL_QUERIES.length>VISUAL_FOODS.length);assert.equal(new Set(VISUAL_QUERIES.map(q=>q.text)).size,VISUAL_QUERIES.length);assert.ok(VISUAL_QUERIES.every(q=>!['a photo of cereal box','a photo of carton of tomato sauce'].includes(q.text)));
  for(const query of VISUAL_QUERIES){assert.ok(query.label===null||VISUAL_FOODS.some(food=>food.label===query.label));assert.ok(query.text.length<120);assert.ok(!['salt','flour','onion powder'].includes(query.label));}
  assert.equal(VISUAL_QUERIES.find(q=>q.text==='a photo of peeled banana').label,'bananas');assert.equal(VISUAL_QUERIES.find(q=>q.text==='a photo of milk carton').label,'milk');
  const nonFood=fakeLibrary({nonFood:true}),recognizer=new LocalFoodRecognizer({libraryLoader:async()=>nonFood.library});assert.deepEqual((await recognizer.recognize(image())).items,[]);
