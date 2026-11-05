@@ -1,4 +1,4 @@
-import {MODEL_CACHE} from './vision-ai-config.mjs?v=20261105.3';
+import {MODEL_CACHE} from './vision-ai-config.mjs?v=20261105.4';
 export async function cachePublicFiles(urls,onProgress=()=>{}){
  let cache;try{cache=await globalThis.caches?.open(MODEL_CACHE);}catch{}
  if(!cache)return;

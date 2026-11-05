@@ -1,4 +1,4 @@
-import {foodForLabel} from './food-labels.mjs?v=20261105.3';
+import {foodForLabel} from './food-labels.mjs?v=20261105.4';
 export function readLabelResults(data,width,height){
  if(!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1)throw Error('Dimensões de fotografia inválidas.');
  const items=new Map(),detections=[];

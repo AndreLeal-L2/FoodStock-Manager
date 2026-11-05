@@ -1,7 +1,7 @@
-import {cachePublicFiles} from './vision-model-files.mjs?v=20261105.3';
-import {MODEL,MODEL_CACHE,RUNTIME_PATH} from './vision-ai-config.mjs?v=20261105.3';
-import {VISUAL_FOODS} from './food-labels.mjs?v=20261105.3';
-import {processPredictions} from './vision-results.mjs?v=20261105.3';
+import {cachePublicFiles} from './vision-model-files.mjs?v=20261105.4';
+import {MODEL,MODEL_CACHE,RUNTIME_PATH} from './vision-ai-config.mjs?v=20261105.4';
+import {VISUAL_QUERIES} from './food-labels.mjs?v=20261105.4';
+import {processPredictions} from './vision-results.mjs?v=20261105.4';
 export async function loadLibrary({onProgress=()=>{}}={}){
  // Persist lazy runtime files even if first use starts before the service worker claims the page.
  await cachePublicFiles(['transformers.mjs','ort-wasm-simd-threaded.jsep.mjs','ort-wasm-simd-threaded.jsep.wasm'].map(file=>new URL(RUNTIME_PATH+file,import.meta.url).href),onProgress);
@@ -39,14 +39,14 @@ export class LocalFoodRecognizer {
  async recognize(image){
   await this.prepare();
   const raw=new this.library.RawImage(image.data,image.width,image.height,4);
-  const inputs={...this.tokenizer(VISUAL_FOODS.map(food=>'a photo of '+food.label),{padding:true,truncation:true}),...await this.processor.image_processor(raw)};
+  const inputs={...this.tokenizer(VISUAL_QUERIES.map(query=>query.text),{padding:true,truncation:true}),...await this.processor.image_processor(raw)};
   this.onProgress({stage:'inference',device:this.device});
   const output=await this.model(inputs);
   const result=this.processor.image_processor.post_process_object_detection(output,MODEL.boxThreshold,[[image.height,image.width]],true)[0];
   if(!result||!Array.isArray(result.boxes)||!Array.isArray(result.classes)||!Array.isArray(result.scores)||result.boxes.length!==result.classes.length||result.boxes.length!==result.scores.length)throw Error('Resposta do modelo inválida.');
   const predictions=result.boxes.map((box,index)=>{
-   if(!Array.isArray(box)||box.length!==4||!Number.isInteger(result.classes[index])||!VISUAL_FOODS[result.classes[index]])throw Error('Identificação do modelo inválida.');
-   return {label:VISUAL_FOODS[result.classes[index]].label,score:result.scores[index],box:{xmin:box[0],ymin:box[1],xmax:box[2],ymax:box[3]}};
+   if(!Array.isArray(box)||box.length!==4||!Number.isInteger(result.classes[index])||!VISUAL_QUERIES[result.classes[index]])throw Error('Identificação do modelo inválida.');
+   return {label:VISUAL_QUERIES[result.classes[index]].label,score:result.scores[index],box:{xmin:box[0],ymin:box[1],xmax:box[2],ymax:box[3]}};
   });
   predictions.sort((a,b)=>b.score-a.score);
   return {...processPredictions(predictions.slice(0,900),image.width,image.height,{threshold:MODEL.boxThreshold}),model:{id:MODEL.id,device:this.device,predictionCount:predictions.length,topPredictions:predictions.slice(0,8).map(({label,score})=>({label,score}))}};

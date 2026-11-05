@@ -9,10 +9,13 @@ function safe(text){return String(text).replace(/https?:\/\/[^\s)"'<>\\]+/g,url=
  const result=await run();
  const visible=new Set(['Bananas','Laranjas','Limões','Lima','Kiwi','Couve']);
  assert.equal(result.method,'visual','The appearance action must use the visual model');
- assert.ok(result.items.filter(item=>visible.has(item.name)).length>=2,'The visual model must identify at least two actual foods; '+JSON.stringify({items:result.items.map(i=>i.name),model:result.model}));
+ assert.ok(result.items.filter(item=>visible.has(item.name)).length>=5,'The visual model must identify at least five actual foods; '+JSON.stringify({items:result.items.map(i=>i.name),model:result.model}));
  assert.ok(result.items.every(item=>visible.has(item.name)),'No salt, milk or other absent foods may be suggested for the fruit fixture; '+JSON.stringify({items:result.items.map(i=>i.name),model:result.model}));assert.ok(result.items.every(item=>item.quantity===null&&item.brand===''));assert.ok(outbound.every(r=>['GET','HEAD','OPTIONS'].includes(r.method)&&!r.body),'Only public file/metadata requests may leave the browser');
  const cacheSummary=await page.evaluate(async()=>{const cache=await caches.open('foodstock-ai-model-v1');return (await cache.keys()).map(r=>new URL(r.url).pathname);});if(process.env.GITHUB_ACTIONS)console.log('::notice title=Online recognition and cache::'+JSON.stringify({items:result.items.map(i=>i.name),files:cacheSummary,predictions:result.model.topPredictions}));
- for(const file of ['grocery-bananas.jpg','grocery-tomatoes.jpg','grocery-milk.jpg','book.png']){const sample=await run(false,file);console.log('::notice title=Local vision baseline::'+JSON.stringify({file,items:sample.items.map(item=>item.name),predictions:sample.model.topPredictions}));}
+ for(const [file,required,allowed] of [['grocery-bananas.jpg',['Bananas'],['Bananas']],['grocery-tomatoes.jpg',['Tomate'],['Tomate','Cenoura']],['grocery-milk.jpg',['Leite'],['Leite']],['book.png',[],[]]]){
+  const sample=await run(false,file),names=sample.items.map(item=>item.name);console.log('::notice title=Local vision sample::'+JSON.stringify({file,items:names,predictions:sample.model.topPredictions}));
+  assert.ok(required.every(name=>names.includes(name))&&names.every(name=>allowed.includes(name)),'Food names must match the public photo: '+JSON.stringify({file,items:names}));
+ }
  const negative=await run(true);assert.deepEqual(negative.items,[],'A blank image must not invent pantry foods');
  await context.setOffline(true);await page.reload();const offline=await run();assert.deepEqual(offline.items,result.items,'Completed downloads must reopen offline with the same reviewed suggestions');
  const text='Real local model gate passed: '+result.items.map(i=>i.name).join(', ')+'; backend '+result.model.device+'. Cold reload also passed offline. No image upload or user references.';console.log('PASS:',text);if(process.env.GITHUB_ACTIONS)console.log('::notice title=Real model validation::'+text);if(process.env.GITHUB_STEP_SUMMARY)await fs.appendFile(process.env.GITHUB_STEP_SUMMARY,'### Real model validation\n\n'+text+'\n');

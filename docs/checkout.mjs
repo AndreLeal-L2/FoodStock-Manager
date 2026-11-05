@@ -1,4 +1,4 @@
-import {checkoutDraft,cents} from './model.mjs?v=20261105.3';
+import {checkoutDraft,cents} from './model.mjs?v=20261105.4';
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=new Intl.NumberFormat('pt-PT',{style:'currency',currency:'EUR'});
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};

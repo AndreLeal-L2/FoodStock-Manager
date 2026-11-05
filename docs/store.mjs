@@ -1,4 +1,4 @@
-import { emptyData,project } from './model.mjs?v=20261105.3';
+import { emptyData,project } from './model.mjs?v=20261105.4';
 const DB_NAME='foodstock-offline-v1';
 const newProfile=key=>({key,instanceId:null,base:emptyData(),pending:[],lastSynced:null,lastError:null});
 let opening;

@@ -1,4 +1,4 @@
-import {PhotoRecognizer} from './photo-recognizer.mjs?v=20261105.3';
+import {PhotoRecognizer} from './photo-recognizer.mjs?v=20261105.4';
 let recognizer=null,busy=false,currentId;
 self.onmessage=async event=>{
  const {id,image,visualOnly}=event.data;if(busy){self.postMessage({id,error:'Já há uma análise em curso.'});return;}

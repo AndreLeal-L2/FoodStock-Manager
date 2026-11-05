@@ -1,4 +1,4 @@
-import {normalizeLabel} from './food-labels.mjs?v=20261105.3';
+import {normalizeLabel} from './food-labels.mjs?v=20261105.4';
 export const categories=['Proteínas','Hidratos e acompanhamentos','Legumes','Fruta','Laticínios','Conservas e leguminosas','Bebidas','Lanche','Temperos','Outros'];
 export function photoDraft(items,products){
  if(!Array.isArray(items)||items.length>60)throw Error('Resposta de reconhecimento inválida.');

@@ -1,6 +1,6 @@
-import {OCR_RUNTIME_PATH} from './vision-ai-config.mjs?v=20261105.3';
-import {cachePublicFiles} from './vision-model-files.mjs?v=20261105.3';
-import {readLabelResults} from './label-results.mjs?v=20261105.3';
+import {OCR_RUNTIME_PATH} from './vision-ai-config.mjs?v=20261105.4';
+import {cachePublicFiles} from './vision-model-files.mjs?v=20261105.4';
+import {readLabelResults} from './label-results.mjs?v=20261105.4';
 export class LabelReader {
  constructor({onProgress=()=>{}}={}){this.onProgress=onProgress;}
  async recognize(image){

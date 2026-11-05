@@ -3,8 +3,8 @@
  * axes: dark/grotesk-sans/cool · posture: restrained · contrast: pass (six views rendered) · v2.0.0 */
 /* Hallmark · pre-emit critique: P4 H4 E4 S5 R5 V4 · weakest: H, compacted the shopping rows and kept sync status separate from save confirmation */
 /* Hallmark · reworded "Atualizar dados" to "Sincronizar" · the primary control now sends the durable browser queue to the API */
-@import url('./tokens.css?v=20261105.3');
-@import url('./base.css?v=20261105.3');
+@import url('./tokens.css?v=20261105.4');
+@import url('./base.css?v=20261105.4');
 @font-face { font-family: 'Host Grotesk'; src: url('./fonts/host-grotesk.ttf') format('truetype'); font-weight: 400 600; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Atkinson Hyperlegible Mono'; src: url('./fonts/atkinson-mono.ttf') format('truetype'); font-weight: 400 500; font-style: normal; font-display: swap; }
 html { background: var(--color-paper-3); }
