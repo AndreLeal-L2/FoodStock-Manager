@@ -20,9 +20,9 @@ test('separate boxes count visible packages, while physical inventory remains a 
  const draft=photoDraft(items,[{id:'rice',name:'Arroz',unit:'kg',stock:4.25}]);assert.equal(draft.items[0].quantity,'');assert.equal(draft.items[0].expectedStock,4.25);draft.items[0].quantity='2';assert.equal(captureData(draft).items[0].quantity,2);
  assert.equal(processPredictions([],200,100).items.length,0);
 });
-function fakeLibrary({failRun=false,invalidClass=false}={}){
+function fakeLibrary({failRun=false,invalidClass=false,nonFood=false}={}){
  const calls={downloads:[],images:[],inputs:[],disposed:0};
- const imageProcessor=Object.assign(async raw=>{calls.images.push(raw);return {pixel_values:raw.data};},{post_process_object_detection:()=>[{boxes:[[0,0,80,90]],classes:[invalidClass?9999:VISUAL_QUERIES.findIndex(query=>query.text==='a photo of bag of rice')],scores:[.8]}]});
+ const imageProcessor=Object.assign(async raw=>{calls.images.push(raw);return {pixel_values:raw.data};},{post_process_object_detection:()=>[{boxes:[[0,0,80,90]],classes:[invalidClass?9999:nonFood?VISUAL_QUERIES.findIndex(query=>query.label===null):VISUAL_QUERIES.findIndex(query=>query.text==='a photo of bag of rice')],scores:[.8]}]});
  const library={env:{backends:{onnx:{wasm:{}}}},RawImage:class{constructor(data,width,height,channels){Object.assign(this,{data,width,height,channels});}},AutoProcessor:{from_pretrained:async(id,options)=>{if(options.local_files_only&&!library.env.allowLocalModels)throw Error('Invalid upstream local-only configuration');calls.downloads.push({id,options});return {image_processor:imageProcessor};}},AutoTokenizer:{from_pretrained:async(id,options)=>{calls.downloads.push({id,options});return prompts=>{assert.deepEqual(prompts,VISUAL_QUERIES.map(query=>query.text));return {input_ids:'all-foods'};};}},AutoModelForZeroShotObjectDetection:{from_pretrained:async(id,options)=>{calls.downloads.push({id,options});return Object.assign(async inputs=>{calls.inputs.push(inputs);assert.ok(inputs.pixel_values instanceof Uint8ClampedArray);assert.equal(inputs.input_ids,'all-foods');if(failRun)throw Error('inference failed');return {};},{dispose:async()=>calls.disposed++});}}};return {library,calls};
 }
 test('model adapter keeps pixels local and uses one inference per photo with all food queries',async()=>{
@@ -63,10 +63,11 @@ test('public runtime assets are cached once and can be reused without network',a
  finally{globalThis.caches=originalCache;globalThis.fetch=originalFetch;}
 });
 
-test('visual descriptions map to canonical foods and keep indistinguishable powders label-only',()=>{
+test('visual descriptions map to canonical foods and reject non-food classes and indistinguishable powders',async()=>{
  assert.ok(VISUAL_QUERIES.length>VISUAL_FOODS.length);assert.equal(new Set(VISUAL_QUERIES.map(q=>q.text)).size,VISUAL_QUERIES.length);
- for(const query of VISUAL_QUERIES){assert.ok(VISUAL_FOODS.some(food=>food.label===query.label));assert.ok(query.text.length<120);assert.ok(!['salt','flour','onion powder'].includes(query.label));}
+ for(const query of VISUAL_QUERIES){assert.ok(query.label===null||VISUAL_FOODS.some(food=>food.label===query.label));assert.ok(query.text.length<120);assert.ok(!['salt','flour','onion powder'].includes(query.label));}
  assert.equal(VISUAL_QUERIES.find(q=>q.text==='a photo of peeled banana').label,'bananas');assert.equal(VISUAL_QUERIES.find(q=>q.text==='a photo of milk carton').label,'milk');
+ const nonFood=fakeLibrary({nonFood:true}),recognizer=new LocalFoodRecognizer({libraryLoader:async()=>nonFood.library});assert.deepEqual((await recognizer.recognize(image())).items,[]);
 });
 test('overlapping different foods survive while aliases and competing labels do not double-count one area',()=>{
  const result=processPredictions([prediction('bananas',.9,box(0,0,200,200)),prediction('kiwi',.85,box(0,0,55,55)),prediction('lime',.8,box(2,2,57,57)),prediction('banana',.8,box(10,10,180,180)),prediction('kiwi',.8,box(60,0,110,55))],200,200);

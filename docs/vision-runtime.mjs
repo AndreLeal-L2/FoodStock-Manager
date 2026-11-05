@@ -46,8 +46,9 @@ export class LocalFoodRecognizer {
   if(!result||!Array.isArray(result.boxes)||!Array.isArray(result.classes)||!Array.isArray(result.scores)||result.boxes.length!==result.classes.length||result.boxes.length!==result.scores.length)throw Error('Resposta do modelo inválida.');
   const predictions=result.boxes.map((box,index)=>{
    if(!Array.isArray(box)||box.length!==4||!Number.isInteger(result.classes[index])||!VISUAL_QUERIES[result.classes[index]])throw Error('Identificação do modelo inválida.');
+   if(VISUAL_QUERIES[result.classes[index]].label===null)return null;
    return {label:VISUAL_QUERIES[result.classes[index]].label,score:result.scores[index],box:{xmin:box[0],ymin:box[1],xmax:box[2],ymax:box[3]}};
-  });
+  }).filter(Boolean);
   predictions.sort((a,b)=>b.score-a.score);
   return {...processPredictions(predictions.slice(0,900),image.width,image.height,{threshold:MODEL.boxThreshold}),model:{id:MODEL.id,device:this.device,predictionCount:predictions.length,topPredictions:predictions.slice(0,8).map(({label,score})=>({label,score}))}};
  }

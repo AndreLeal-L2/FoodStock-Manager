@@ -47,7 +47,11 @@ const visualDescriptions={
  'olive oil':['bottle of olive oil'],'juice':['juice carton'],'coffee':['bag of coffee'],
  'bread':['sliced bread'],'cookies':['biscuits'],'breakfast cereal':['cereal box']
 };
-export const VISUAL_QUERIES=VISUAL_FOODS.flatMap(food=>[food.label,...visualDescriptions[food.label]||[]].map(description=>({label:food.label,text:'a photo of '+description})));
+// Non-food alternatives let the detector reject packaging instead of assigning a food to every object.
+export const VISUAL_QUERIES=[
+ ...VISUAL_FOODS.flatMap(food=>[food.label,...(visualDescriptions[food.label]||[])].map(description=>({label:food.label,text:'a photo of '+description}))),
+ ...['a cardboard box','an empty plastic container','a plastic bag','a paper label','a book','a shelf','a price tag'].map(description=>({label:null,text:'a photo of '+description}))
+];
 
 export function normalizeLabel(value){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();}
 const names=FOODS.flatMap(food=>food.aliases.map(alias=>({food,alias:normalizeLabel(alias)}))).sort((a,b)=>b.alias.length-a.alias.length);
