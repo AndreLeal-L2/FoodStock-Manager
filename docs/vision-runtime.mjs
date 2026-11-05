@@ -16,7 +16,7 @@ export class LocalFoodRecognizer {
  constructor({libraryLoader=loadLibrary,onProgress=()=>{},revisionResolver=async()=>MODEL.revision}={}){Object.assign(this,{libraryLoader,onProgress,revisionResolver,device:null,model:null,processor:null,library:null});}
  async prepare(){
   if(this.model)return;
-  if(globalThis.navigator?.deviceMemory&&navigator.deviceMemory<8)throw Error('Este dispositivo tem pouca memória para a análise visual. Usa a leitura de rótulos ou um computador com pelo menos 8 GB.');
+  if(globalThis.navigator?.deviceMemory&&navigator.deviceMemory<4)throw Error('Este dispositivo tem pouca memória para a análise visual. Usa a leitura de rótulos ou um computador com pelo menos 4 GB.');
   this.onProgress({stage:'runtime'});const revision=await this.revisionResolver();this.library=await this.libraryLoader({onProgress:this.onProgress});configureLibrary(this.library);
   // The upstream tokenizer existence probe drops its revision/options. Pin the URL
   // template too, so that probe reads the same immutable files from our cache.

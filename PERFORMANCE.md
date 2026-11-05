@@ -1,5 +1,7 @@
 # Otimizações com Ponytail
 
+Medições da revisão `20261105.2`. As opções de identificação da versão atual estão descritas no README.
+
 Aplicado o [Ponytail full](https://github.com/DietrichGebert/ponytail/blob/96608e078b2d5ea607c5c3b8b5a54d1c1fba6846/skills/ponytail/SKILL.md): reutilizar código existente, eliminar trabalho repetido e manter validações. Não foram adicionadas dependências, instaladores ou hooks.
 
 Comparação com `ffa2b4f`, em Node 24.19.0 no ambiente de desenvolvimento:
