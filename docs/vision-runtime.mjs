@@ -40,7 +40,7 @@ export class LocalFoodRecognizer {
   const result=this.processor.post_process_grounded_object_detection(output,inputs.input_ids,{box_threshold:MODEL.boxThreshold,text_threshold:MODEL.textThreshold,target_sizes:[[image.height,image.width]]})[0];
   if(!result||!Array.isArray(result.boxes)||!Array.isArray(result.labels)||!Array.isArray(result.scores)||result.boxes.length!==result.labels.length||result.boxes.length!==result.scores.length)throw Error('Resposta do modelo inválida.');
   const predictions=result.boxes.map((b,i)=>({label:result.labels[i],score:result.scores[i],box:{xmin:b[0],ymin:b[1],xmax:b[2],ymax:b[3]}}));
-  return {...processPredictions(predictions,image.width,image.height,{threshold:MODEL.boxThreshold}),model:{id:MODEL.id,device:this.device}};
+  return {...processPredictions(predictions,image.width,image.height,{threshold:MODEL.boxThreshold}),model:{id:MODEL.id,device:this.device,predictionCount:predictions.length,topPredictions:predictions.slice().sort((a,b)=>b.score-a.score).slice(0,8).map(({label,score})=>({label,score}))}};
  }
  async dispose(){await this.model?.dispose?.();this.model=null;this.processor=null;}
 }
