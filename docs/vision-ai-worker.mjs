@@ -1,4 +1,4 @@
-import {LocalFoodRecognizer} from './vision-runtime.mjs?v=20261104.1';
+import {LocalFoodRecognizer} from './vision-runtime.mjs?v=20261105.1';
 let recognizer=null,busy=false,currentId;
 self.onmessage=async event=>{
  const {id,image}=event.data;if(busy){self.postMessage({id,error:'Já há uma análise em curso.'});return;}

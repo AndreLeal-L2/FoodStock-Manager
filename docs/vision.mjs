@@ -1,5 +1,5 @@
-import {VisionModelClient,readImage} from './vision-client.mjs?v=20261104.1';
-import {photoDraft,captureData,categories} from './vision-model.mjs?v=20261104.1';
+import {VisionModelClient,readImage} from './vision-client.mjs?v=20261105.1';
+import {photoDraft,captureData,categories} from './vision-model.mjs?v=20261105.1';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export class Vision {
  constructor(getStore,notify,reload){

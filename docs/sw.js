@@ -1,4 +1,4 @@
-const VERSION='20261104.1';
+const VERSION='20261105.1';
 const CACHE='foodstock-shell-'+VERSION;
 const MODEL_CACHE='foodstock-ai-model-v1';
 const FILES=['./','index.html','style.css','tokens.css','base.css','boot.js','app.js','store.mjs','model.mjs','checkout.mjs','cloud.mjs','config.mjs','vision.mjs','vision-model.mjs','vision-client.mjs','vision-ai-worker.mjs','vision-runtime.mjs','vision-model-files.mjs','vision-ai-config.mjs','vision-results.mjs','food-labels.mjs','shopping-template.mjs','fonts/host-grotesk.ttf','fonts/atkinson-mono.ttf'];

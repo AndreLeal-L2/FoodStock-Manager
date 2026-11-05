@@ -92,7 +92,7 @@ As validações distinguem domínio/privacidade/cancelamento, UI com fronteira d
 - IndexedDB guarda uma base confirmada e a fila antes de confirmar o sucesso no ecrã. O Postgres aplica cada operação numa transação e guarda um recibo. A fila só remove uma operação quando o snapshot confirma esse recibo. Um reenvio ou resposta perdida não duplica o stock.
 - A aplicação tenta sincronizar ao abrir, ao voltar ao separador, ao recuperar rede e a cada 15 segundos enquanto está visível. Não pode sincronizar com a página fechada. Sessões expiradas são renovadas; se for necessário novo login, a fila não é descartada nem marcada como permanentemente inválida.
 - Os dados pertencem à conta, com **Row Level Security** em todas as tabelas. A chave pública sozinha não dá acesso. As mutações passam por RPCs autenticadas; o cliente não pode atualizar diretamente tabelas e contornar os recibos/validações.
-- O service worker guarda apenas a interface/fontes, não respostas autenticadas nem imagens. Para atualizar uma versão já aberta, fecha os separadores antigos e abre de novo. Na primeira visita é necessária Internet.
+- O service worker guarda a interface/fontes e, depois do primeiro uso, o runtime visual numa cache separada. Os pesos públicos também ficam em cache. Não guarda respostas autenticadas nem imagens. Para atualizar uma versão já aberta, fecha os separadores antigos e abre de novo. Na primeira visita é necessária Internet.
 - Limpar os dados do site ou remover armazenamento pode apagar a cópia local e operações por enviar. **Exporta backups antes disso.** O backup não inclui tokens da sessão nem a chave de IA.
 
 ## Desenvolvimento e testes

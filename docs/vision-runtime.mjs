@@ -1,7 +1,7 @@
-import {resolveModelRevision} from './vision-model-files.mjs?v=20261104.1';
-import {MODEL,MODEL_CACHE,RUNTIME_PATH} from './vision-ai-config.mjs?v=20261104.1';
-import {FOOD_PROMPT} from './food-labels.mjs?v=20261104.1';
-import {processPredictions} from './vision-results.mjs?v=20261104.1';
+import {resolveModelRevision} from './vision-model-files.mjs?v=20261105.1';
+import {MODEL,MODEL_CACHE,RUNTIME_PATH} from './vision-ai-config.mjs?v=20261105.1';
+import {FOOD_PROMPT} from './food-labels.mjs?v=20261105.1';
+import {processPredictions} from './vision-results.mjs?v=20261105.1';
 export async function loadLibrary({onProgress=()=>{}}={}){
  // Persist lazy runtime files even if first use starts before the service worker claims the page.
  let cache;try{cache=await globalThis.caches?.open(MODEL_CACHE);}catch{}

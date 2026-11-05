@@ -1,8 +1,8 @@
-import { LocalStore } from './store.mjs?v=20261104.1';
-import { statistics, quantity } from './model.mjs?v=20261104.1';
-import { Checkout } from './checkout.mjs?v=20261104.1';
-import { SupabaseCloud } from './cloud.mjs?v=20261104.1';
-import { Vision } from './vision.mjs?v=20261104.1';
+import { LocalStore } from './store.mjs?v=20261105.1';
+import { statistics, quantity } from './model.mjs?v=20261105.1';
+import { Checkout } from './checkout.mjs?v=20261105.1';
+import { SupabaseCloud } from './cloud.mjs?v=20261105.1';
+import { Vision } from './vision.mjs?v=20261105.1';
 const $ = s => document.querySelector(s);
 const currency = new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' });
 const number = new Intl.NumberFormat('pt-PT', { maximumFractionDigits: 3 });

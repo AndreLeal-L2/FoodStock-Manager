@@ -1,4 +1,4 @@
-import {MODEL_CACHE} from './vision-ai-config.mjs?v=20261104.1';
+import {MODEL_CACHE} from './vision-ai-config.mjs?v=20261105.1';
 // A reusable worker keeps public model weights warm between photos; cancellation destroys it.
 export class VisionModelClient {
  constructor({workerFactory=url=>new Worker(url,{type:'module'})}={}){this.workerFactory=workerFactory;this.worker=null;this.job=null;}
@@ -9,7 +9,7 @@ export class VisionModelClient {
   if(globalThis.navigator?.deviceMemory&&navigator.deviceMemory<4)return Promise.reject(Error('O navegador reporta pouca memória para este modelo. Usa o Mac ou adiciona os alimentos manualmente neste dispositivo.'));
   return new Promise((resolve,reject)=>{
    const id=crypto.randomUUID(),url=new URL('./vision-ai-worker.mjs'+new URL(import.meta.url).search,import.meta.url);
-   if(!this.worker){this.worker=this.workerFactory(url);this.worker.onmessage=event=>{const job=this.job;if(!job||event.data.id!==job.id)return;if(event.data.progress){job.onProgress(event.data.progress);return;}job.finish(event.data.error?Object.assign(Error(event.data.error),{detail:event.data.detail}):null,event.data.result);};this.worker.onerror=()=>{this.job?.finish(Error('O modelo local não conseguiu iniciar. Tenta recarregar a interface ou usar um navegador atualizado.'));this.worker?.terminate();this.worker=null;};}
+   if(!this.worker){this.worker=this.workerFactory(url);const worker=this.worker;worker.onmessage=event=>{if(this.worker!==worker)return;const job=this.job;if(!job||event.data.id!==job.id)return;if(event.data.progress){job.onProgress(event.data.progress);return;}job.finish(event.data.error?Object.assign(Error(event.data.error),{detail:event.data.detail}):null,event.data.result);};worker.onerror=()=>{if(this.worker!==worker)return;this.job?.finish(Error('O modelo local não conseguiu iniciar. Tenta recarregar a interface ou usar um navegador atualizado.'));worker.terminate();this.worker=null;};}
    let done=false;const abort=()=>{finish(new DOMException('Análise cancelada.','AbortError'));this.worker?.terminate();this.worker=null;};
    const timeout=setTimeout(()=>{finish(Error('A análise demorou demasiado. Tenta uma fotografia mais simples ou usa o Mac.'));this.worker?.terminate();this.worker=null;},600000);
    const finish=(error,result)=>{if(done)return;done=true;clearTimeout(timeout);signal?.removeEventListener('abort',abort);this.job=null;error?reject(error):resolve(result);};

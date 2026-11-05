@@ -1,4 +1,4 @@
-import {foodForLabel} from './food-labels.mjs?v=20261104.1';
+import {foodForLabel} from './food-labels.mjs?v=20261105.1';
 function overlap(a,b){const intersection=Math.max(0,Math.min(a.xmax,b.xmax)-Math.max(a.xmin,b.xmin))*Math.max(0,Math.min(a.ymax,b.ymax)-Math.max(a.ymin,b.ymin));return intersection/Math.max(1,Math.min((a.xmax-a.xmin)*(a.ymax-a.ymin),(b.xmax-b.xmin)*(b.ymax-b.ymin)));}
 export function processPredictions(predictions,width,height,{threshold=.25}={}){
  if(!Array.isArray(predictions)||predictions.length>900||!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1)throw Error('O modelo devolveu uma resposta inválida.');
