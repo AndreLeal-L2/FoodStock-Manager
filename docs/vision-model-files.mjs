@@ -1,4 +1,4 @@
-import {MODEL,MODEL_CACHE} from './vision-ai-config.mjs?v=20261105.1';
+import {MODEL,MODEL_CACHE} from './vision-ai-config.mjs?v=20261105.2';
 // Pin the first download to an immutable Hub commit, then reuse it offline.
 // Only a public model ID/revision is sent. Images never enter these requests.
 export async function resolveModelRevision({fetcher=globalThis.fetch,cacheStorage=globalThis.caches}={}){

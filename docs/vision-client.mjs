@@ -1,4 +1,4 @@
-import {MODEL_CACHE} from './vision-ai-config.mjs?v=20261105.1';
+import {MODEL_CACHE} from './vision-ai-config.mjs?v=20261105.2';
 // A reusable worker keeps public model weights warm between photos; cancellation destroys it.
 export class VisionModelClient {
  constructor({workerFactory=url=>new Worker(url,{type:'module'})}={}){this.workerFactory=workerFactory;this.worker=null;this.job=null;}

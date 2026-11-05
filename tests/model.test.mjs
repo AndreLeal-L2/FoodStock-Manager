@@ -84,3 +84,27 @@ test('inventory counts replace quantities without creating expenses, repeat safe
  const bad={kind:'INVENTORY_CAPTURE',data:{items:[{productId:id,expectedStock:2,quantity:4,category:'Outros',brand:''},{productId:crypto.randomUUID(),expectedStock:0,quantity:1,category:'Outros',brand:''}]}};
  assert.throws(()=>applyOperation(base,bad),/não encontrado/);assert.equal(base.products[0].stock,2);
 });
+
+test('statistics keep exact totals, store names and all-year price history across products',()=>{
+ const data=emptyData();data.products=[{id:'rice',name:'Arroz',unit:'kg'},{id:'milk',name:'Leite',unit:'un'},{id:'pasta',name:'Massa',unit:'kg'}];
+ data.purchases=[
+  {productId:'rice',purchasedOn:'2025-02-01',quantity:2,total:5.50,store:'A'},
+  {productId:'milk',purchasedOn:'2024-03-02',quantity:4,total:4,store:'B'},
+  {productId:'rice',purchasedOn:'2024-01-02',quantity:1,total:2.75,store:'__proto__'},
+  {productId:'rice',purchasedOn:'2024-01-01',quantity:2,total:5.50,store:'A'},
+  {productId:'milk',purchasedOn:'2023-12-31',quantity:2,total:2,store:'A'}
+ ];
+ const original=structuredClone(data),stats=statistics(data,2024);
+ assert.equal(stats.total,12.25);assert.equal(stats.previousYearTotal,2);assert.equal(stats.yearChangePercent,512.5);
+ assert.deepEqual(stats.stores,{A:5.5,B:4,['__proto__']:2.75});
+ assert.deepEqual(stats.months.slice(0,4),[
+  {month:'2024-01',total:8.25,previousMonthChangePercent:312.5},
+  {month:'2024-02',total:0,previousMonthChangePercent:-100},
+  {month:'2024-03',total:4,previousMonthChangePercent:null},
+  {month:'2024-04',total:0,previousMonthChangePercent:-100}
+ ]);
+ assert.deepEqual(stats.prices.map(p=>[p.productId,p.latestDate,p.latestUnitPrice,p.previousUnitPrice,p.changePercent,p.cheapestDate,p.purchaseCount]),[
+  ['rice','2025-02-01',2.75,2.75,0,'2025-02-01',3],['milk','2024-03-02',1,1,0,'2024-03-02',2]
+ ]);
+ assert.deepEqual(statistics(data,2022).stores,{});assert.deepEqual(data,original);
+});

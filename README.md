@@ -128,3 +128,7 @@ Antes de publicar alterações ao front-end, executa `npm run release:client -- 
 O carregador inicial regista a atualização offline mesmo quando um módulo falha. Em caso de erro ou demora excessiva, aparece **Recarregar interface** em vez de ficar indefinidamente em “A abrir os dados”. Essa ação remove apenas caches `foodstock-shell-*` e o service worker desta aplicação; preserva IndexedDB, sessões, stock, compras, rascunhos e fila pendente. A página recarrega para obter os ficheiros atuais. Não uses “Limpar dados do site” para resolver uma atualização.
 
 O teste de atualização reproduz uma cache v5 anterior à migração, passa para o HTML atual e verifica abertura de Dados, conta FoodStock sem campos técnicos e preservação do stock/fila/rascunho. Também simula um módulo indisponível e verifica a recuperação sem apagar dados ou caches de outras aplicações.
+
+## Otimização do código
+
+A revisão `20261105.2` aplica o [Ponytail full](https://github.com/DietrichGebert/ponytail/blob/main/skills/ponytail/SKILL.md) às estatísticas, à preparação da fotografia e à formatação de datas. As alterações reutilizam a plataforma e as dependências existentes. Métodos, medições e limites estão em [PERFORMANCE.md](PERFORMANCE.md).

@@ -1,4 +1,4 @@
-import template from './shopping-template.mjs?v=20261105.1';
+import template from './shopping-template.mjs?v=20261105.2';
 export const emptyData=()=>({schemaVersion:3,products:[],purchases:[],movements:[],shoppingList:{templateImported:false,items:[]}});
 export const quantity=value=>Math.round(Number(value)*1000);
 export const cents=value=>Math.round(Number(value)*100);
@@ -123,27 +123,31 @@ export function project(base,pending,strict=false) {
  return {data,warnings};
 }
 export function statistics(data,year) {
- const totalOf=list=>list.reduce((sum,p)=>sum+cents(p.total),0);
- const all=data.purchases;
+ const monthCents=new Map(),histories=new Map(),storeCents=new Map();
+ let total=0,previous=0;
+ for(const purchase of data.purchases){
+  const amount=cents(purchase.total),month=purchase.purchasedOn.slice(0,7);
+  monthCents.set(month,(monthCents.get(month)||0)+amount);
+  if(!histories.has(purchase.productId))histories.set(purchase.productId,[]);
+  histories.get(purchase.productId).push(purchase);
+  if(purchase.purchasedOn.startsWith(`${year}-`)){total+=amount;storeCents.set(purchase.store,(storeCents.get(purchase.store)||0)+amount);}
+  if(purchase.purchasedOn.startsWith(`${year-1}-`))previous+=amount;
+ }
  const variation=(now,previous)=>previous===0?null:Math.round((now-previous)/previous*10000)/100;
  const months=Array.from({length:12},(_,i)=>{
   const month=`${year}-${String(i+1).padStart(2,'0')}`;
   const previous=i===0?`${year-1}-12`:`${year}-${String(i).padStart(2,'0')}`;
-  const total=totalOf(all.filter(p=>p.purchasedOn.startsWith(month)));
-  return {month,total:total/100,previousMonthChangePercent:variation(total,totalOf(all.filter(p=>p.purchasedOn.startsWith(previous))))};
+  const total=monthCents.get(month)||0;
+  return {month,total:total/100,previousMonthChangePercent:variation(total,monthCents.get(previous)||0)};
  });
- const total=totalOf(all.filter(p=>p.purchasedOn.startsWith(`${year}-`)));
- const previous=totalOf(all.filter(p=>p.purchasedOn.startsWith(`${year-1}-`)));
  const prices=[];
  for(const product of data.products) {
-  const history=all.filter(p=>p.productId===product.id);if(!history.length)continue;
+  const history=histories.get(product.id);if(!history)continue;
   const unitPrice=p=>cents(p.total)*10/quantity(p.quantity);
   const latest=history[0], cheapest=history.reduce((a,b)=>unitPrice(b)<unitPrice(a)?b:a);
   prices.push({productId:product.id,name:product.name,unit:product.unit,latestUnitPrice:unitPrice(latest),latestStore:latest.store,latestDate:latest.purchasedOn,
    previousUnitPrice:history[1]?unitPrice(history[1]):null,changePercent:history[1]?variation(unitPrice(latest),unitPrice(history[1])):null,
    cheapestUnitPrice:unitPrice(cheapest),cheapestStore:cheapest.store,cheapestDate:cheapest.purchasedOn,purchaseCount:history.length});
  }
- const storeCents=new Map();
- all.filter(p=>p.purchasedOn.startsWith(`${year}-`)).forEach(p=>storeCents.set(p.store,(storeCents.get(p.store)||0)+cents(p.total)));
  return {year,total:total/100,previousYearTotal:previous/100,yearChangePercent:variation(total,previous),months,prices,stores:Object.fromEntries([...storeCents].sort().map(([k,v])=>[k,v/100]))};
 }

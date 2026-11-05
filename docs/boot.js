@@ -1,6 +1,6 @@
 // This loader must run before importing any application module, including after an update.
 (()=>{
- const VERSION='20261105.1';
+ const VERSION='20261105.2';
  const button=document.querySelector('#recover-interface'),message=document.querySelector('#message');
  function failed(error){
   console.error('FoodStock startup:',error);
