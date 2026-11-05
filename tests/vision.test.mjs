@@ -9,7 +9,7 @@ const box=(xmin=0,ymin=0,xmax=100,ymax=100)=>({xmin,ymin,xmax,ymax});
 const prediction=(label,score=.8,b=box())=>({label,score,box:b});
 const image=()=>({width:100,height:100,data:new Uint8ClampedArray(100*100*4)});
 test('automatic vocabulary covers pantry foods without a user reference catalogue',()=>{
- assert.equal(foodForLabel('bag of rice').name,'Arroz');assert.equal(foodForLabel('canned beans').name,'Feijão');assert.equal(foodForLabel('tomato sauce').name,'Polpa de tomate');assert.equal(foodForLabel('orange juice').name,'Sumo');assert.equal(foodForLabel('potato chips').name,'Batatas fritas');assert.equal(foodForLabel('spaceship'),null);assert.equal(foodForLabel('rice milk'),null);assert.ok(VISUAL_FOODS.some(food=>food.label==='rice'));
+ assert.equal(foodForLabel('bag of rice').name,'Arroz');assert.equal(foodForLabel('canned beans').name,'Feijão');assert.equal(foodForLabel('tomato sauce').name,'Polpa de tomate');assert.equal(foodForLabel('orange juice').name,'Sumo');assert.equal(foodForLabel('potato chips').name,'Batatas fritas');assert.equal(foodForLabel('BISCOTTI').name,'Bolachas');assert.equal(foodForLabel('spaceship'),null);assert.equal(foodForLabel('rice milk'),null);assert.ok(VISUAL_FOODS.some(food=>food.label==='rice'));
 });
 test('model results reject unknown/weak/invalid predictions, clip boxes and deduplicate overlapping products',()=>{
  const result=processPredictions([prediction('rice',.9,box(-20,-10,80,90)),prediction('rice',.8,box(0,0,75,85)),prediction('beans',.8,box(110,10,180,90)),prediction('spaceship'),prediction('milk',.1),prediction('water bottle',NaN),prediction('eggs',.8,{...box(),xmax:Infinity})],200,100);

@@ -23,7 +23,7 @@ const groups=[
   ['water bottle','Água',['bottled water']],['juice','Sumo',['orange juice','apple juice']],['coffee','Café',[]],['tea','Chá',[]]
  ]],
  ['Lanche',[
-  ['bread','Pão',[]],['potato chips','Batatas fritas',['chips','crisps']],['cookies','Bolachas',['biscuits']],['chocolate','Chocolate',['milk chocolate']],['breakfast cereal','Cereais',['cereal']],['potato sticks','Batata palha',[]]
+  ['bread','Pão',[]],['potato chips','Batatas fritas',['chips','crisps']],['cookies','Bolachas',['biscuits','biscotti']],['chocolate','Chocolate',['milk chocolate']],['breakfast cereal','Cereais',['cereal']],['potato sticks','Batata palha',[]]
  ]],
  ['Temperos',[
   ['salt','Sal',[]],['black pepper','Pimenta',['pimenta preta']],['spices','Temperos',[]],['onion powder','Cebola em pó',[]]
@@ -46,7 +46,7 @@ const visualDescriptions={
  'milk':['milk carton'],'yogurt':['yogurt carton','yogurt cup'],
  'beans':['canned beans','bag of beans'],
  'olive oil':['bottle of olive oil'],'juice':['juice carton'],'coffee':['bag of coffee'],
- 'bread':['sliced bread'],'cookies':['biscuits']
+ 'bread':['sliced bread'],'cookies':['biscuits','biscotti']
 };
 // Non-food alternatives let the detector reject packaging instead of assigning a food to every object.
 export const VISUAL_QUERIES=[
