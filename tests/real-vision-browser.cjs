@@ -10,11 +10,11 @@ async function compareDetector(page,encoded){
   const id='Xenova/owlv2-base-patch16-ensemble',metadata=await (await fetch('https://huggingface.co/api/models/'+id)).json(),revision=metadata.sha;
   if(!/^[a-f0-9]{40}$/.test(revision))throw Error('Invalid public model revision');
   const library=await loadLibrary();configureLibrary(library);library.env.remotePathTemplate='{model}/resolve/'+revision+'/';
-  const options={revision,dtype:'q8',device:'wasm'},processor=await library.AutoProcessor.from_pretrained(id,options),model=await library.AutoModelForZeroShotObjectDetection.from_pretrained(id,options);
+  const options={revision,dtype:'q8',device:'wasm'},processor=await library.AutoProcessor.from_pretrained(id,options),tokenizer=await library.AutoTokenizer.from_pretrained(id,options),model=await library.AutoModelForZeroShotObjectDetection.from_pretrained(id,options);
   const labels=FOODS.filter(food=>FOOD_PROMPTS.some(prompt=>prompt.includes(food.label+'.'))).map(food=>food.label),bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0)),canvas=await readImage(new File([bytes],'fruits.jpg',{type:'image/jpeg'}),1280),image=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height),raw=new library.RawImage(image.data,image.width,image.height,4);
   const start=performance.now();
   try{
-   const inputs={...processor.tokenizer(labels.map(label=>'a photo of '+label),{padding:true,truncation:true}),...await processor.image_processor(raw)},output=await model(inputs),result=processor.image_processor.post_process_object_detection(output,.1,[[image.height,image.width]],true)[0];
+   const inputs={...tokenizer(labels.map(label=>'a photo of '+label),{padding:true,truncation:true}),...await processor.image_processor(raw)},output=await model(inputs),result=processor.image_processor.post_process_object_detection(output,.1,[[image.height,image.width]],true)[0];
    const predictions=result.boxes.map((b,i)=>({label:labels[result.classes[i]],score:result.scores[i],box:{xmin:b[0],ymin:b[1],xmax:b[2],ymax:b[3]}})).sort((a,b)=>b.score-a.score);
    return {id,revision,seconds:Math.round((performance.now()-start)/1000),items:processPredictions(predictions.slice(0,900),image.width,image.height,{threshold:.1}).items.map(item=>item.name),predictions:predictions.slice(0,12).map(({label,score})=>({label,score}))};
   }finally{await model.dispose();}
