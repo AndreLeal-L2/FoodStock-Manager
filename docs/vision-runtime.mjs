@@ -1,6 +1,6 @@
 import {cachePublicFiles} from './vision-model-files.mjs?v=20261105.3';
 import {MODEL,MODEL_CACHE,RUNTIME_PATH} from './vision-ai-config.mjs?v=20261105.3';
-import {FOOD_PROMPTS} from './food-labels.mjs?v=20261105.3';
+import {VISUAL_FOODS} from './food-labels.mjs?v=20261105.3';
 import {processPredictions} from './vision-results.mjs?v=20261105.3';
 export async function loadLibrary({onProgress=()=>{}}={}){
  // Persist lazy runtime files even if first use starts before the service worker claims the page.
@@ -27,6 +27,7 @@ export class LocalFoodRecognizer {
    // Transformers.js requires this flag even for its browser-cache-only mode.
    this.library.env.allowLocalModels=this.options.local_files_only;
    this.processor=await this.library.AutoProcessor.from_pretrained(MODEL.id,this.options);
+   this.tokenizer=await this.library.AutoTokenizer.from_pretrained(MODEL.id,this.options);
    this.device='wasm';
    this.model=await this.library.AutoModelForZeroShotObjectDetection.from_pretrained(MODEL.id,{...this.options,device:this.device});
   };
@@ -37,19 +38,18 @@ export class LocalFoodRecognizer {
  }
  async recognize(image){
   await this.prepare();
-  const raw=new this.library.RawImage(image.data,image.width,image.height,4),predictions=[];
-  const imageInputs=await this.processor.image_processor(raw);
-  // Short category captions avoid interference between dozens of unrelated food names.
-  for(const [part,prompt] of FOOD_PROMPTS.entries()){
-   this.onProgress({stage:'inference',device:this.device,part:part+1,total:FOOD_PROMPTS.length});
-   const inputs={...this.processor.tokenizer(prompt,{padding:true,truncation:true,max_length:256}),...imageInputs};
-   const output=await this.model(inputs);
-   const result=this.processor.post_process_grounded_object_detection(output,inputs.input_ids,{box_threshold:MODEL.boxThreshold,text_threshold:MODEL.textThreshold,target_sizes:[[image.height,image.width]]})[0];
-   if(!result||!Array.isArray(result.boxes)||!Array.isArray(result.labels)||!Array.isArray(result.scores)||result.boxes.length!==result.labels.length||result.boxes.length!==result.scores.length)throw Error('Resposta do modelo inválida.');
-   predictions.push(...result.boxes.map((b,i)=>({label:result.labels[i],score:result.scores[i],box:{xmin:b[0],ymin:b[1],xmax:b[2],ymax:b[3]}})));
-  }
+  const raw=new this.library.RawImage(image.data,image.width,image.height,4);
+  const inputs={...this.tokenizer(VISUAL_FOODS.map(food=>'a photo of '+food.label),{padding:true,truncation:true}),...await this.processor.image_processor(raw)};
+  this.onProgress({stage:'inference',device:this.device});
+  const output=await this.model(inputs);
+  const result=this.processor.image_processor.post_process_object_detection(output,MODEL.boxThreshold,[[image.height,image.width]],true)[0];
+  if(!result||!Array.isArray(result.boxes)||!Array.isArray(result.classes)||!Array.isArray(result.scores)||result.boxes.length!==result.classes.length||result.boxes.length!==result.scores.length)throw Error('Resposta do modelo inválida.');
+  const predictions=result.boxes.map((box,index)=>{
+   if(!Array.isArray(box)||box.length!==4||!Number.isInteger(result.classes[index])||!VISUAL_FOODS[result.classes[index]])throw Error('Identificação do modelo inválida.');
+   return {label:VISUAL_FOODS[result.classes[index]].label,score:result.scores[index],box:{xmin:box[0],ymin:box[1],xmax:box[2],ymax:box[3]}};
+  });
   predictions.sort((a,b)=>b.score-a.score);
   return {...processPredictions(predictions.slice(0,900),image.width,image.height,{threshold:MODEL.boxThreshold}),model:{id:MODEL.id,device:this.device,predictionCount:predictions.length,topPredictions:predictions.slice(0,8).map(({label,score})=>({label,score}))}};
  }
- async dispose(){await this.model?.dispose?.();this.model=null;this.processor=null;}
+ async dispose(){await this.model?.dispose?.();this.model=null;this.processor=null;this.tokenizer=null;}
 }

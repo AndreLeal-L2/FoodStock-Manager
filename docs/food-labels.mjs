@@ -32,8 +32,7 @@ const groups=[
 // Visually similar powders need readable labels, not guesses from texture.
 const labelOnly=new Set(['salt','black pepper','spices','flour','onion powder']);
 export const FOODS=groups.flatMap(([category,items])=>items.map(([label,name,aliases])=>({label,name,category,aliases:[label,name,...aliases]})));
-export const FOOD_PROMPTS=groups.map(([,items])=>items.filter(([label])=>!labelOnly.has(label)).map(([label])=>label+'.').join(' ')).filter(Boolean);
-export const FOOD_PROMPT=FOOD_PROMPTS.join(' ');
+export const VISUAL_FOODS=FOODS.filter(food=>!labelOnly.has(food.label));
 export function normalizeLabel(value){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();}
 const names=FOODS.flatMap(food=>food.aliases.map(alias=>({food,alias:normalizeLabel(alias)}))).sort((a,b)=>b.alias.length-a.alias.length);
 export function foodForLabel(label){

@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {readLabelResults} from '../docs/label-results.mjs';
-import {foodForLabel,FOOD_PROMPTS} from '../docs/food-labels.mjs';
+import {foodForLabel,VISUAL_FOODS} from '../docs/food-labels.mjs';
 import {LocalFoodRecognizer} from '../docs/vision-runtime.mjs';
 import {PhotoRecognizer} from '../docs/photo-recognizer.mjs';
 import {photoDraft,appendPhotoDraft} from '../docs/vision-model.mjs';
@@ -15,7 +15,7 @@ test('ingredients, absence claims, uncertain words, unrelated text and invalid b
  for(const phrase of ['Ingredientes: leite','PODE CONTER OVOS','SEM LEITE','NÃO CONTÉM LEITE','Traços de amendoim','Informação nutricional: leite','ARROZ LEITE','BANCO','BEBIDA VEGETAL SEM LEITE','MAY CONTAIN MILK','WITHOUT MILK','MILK FREE'])assert.equal(readLabelResults(sample([phrase]),1000,500).items.length,0,phrase);
  assert.equal(readLabelResults(sample(['ARROZ'],45),1000,500).items.length,0);const invalid=sample(['ARROZ']);invalid.blocks[0].paragraphs[0].lines[0].words[0].bbox.x0=NaN;assert.equal(readLabelResults(invalid,1000,500).items.length,0);assert.throws(()=>readLabelResults({},NaN,50));
  assert.equal(readLabelResults(sample(['Ingredientes:','LEITE']),1000,500).items.length,0);assert.equal(readLabelResults(sample(['LEITE SEM LACTOSE']),1000,500).items[0].name,'Leite');
- assert.equal(foodForLabel('salt').name,'Sal');assert.ok(FOOD_PROMPTS.every(prompt=>!prompt.includes('salt.')&&!prompt.includes('flour.')&&!prompt.includes('onion powder.')));
+ assert.equal(foodForLabel('salt').name,'Sal');assert.ok(VISUAL_FOODS.every(food=>!['salt','flour','onion powder'].includes(food.label)));
 });
 test('reading labels never downloads the large visual model, including photos without readable names',async()=>{
  for(const found of [true,false]){const image={privatePixels:true},reader=new PhotoRecognizer({labels:{recognize:async original=>{assert.equal(original,image);return {items:found?[recognized('Arroz')]:[],detections:[]};}},visual:{recognize:async()=>assert.fail('Visual download must require an explicit action')}});const result=await reader.recognize(image);assert.equal(result.method,'labels');assert.equal(result.items.length,found?1:0);}

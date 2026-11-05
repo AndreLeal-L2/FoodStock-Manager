@@ -65,7 +65,6 @@ export class Vision {
  progress(progress){
   const status=document.querySelector('#photo-status');
   if(progress.stage==='labels')status.textContent='A ler os rótulos neste dispositivo. A foto não é enviada; podes cancelar.';
-  else if(progress.stage==='labels-unavailable')status.textContent='Não foi possível ler os rótulos. A tentar identificação visual local…';
   else if(progress.stage==='runtime')status.textContent='A iniciar a pesquisa visual. Na primeira utilização, o modelo pode ocupar centenas de MB; prefere Wi-Fi.';
   else if(progress.stage==='download'){const mb=value=>(value/1048576).toFixed(1);status.textContent=progress.total>0?`A descarregar um ficheiro do modelo: ${mb(progress.loaded)} de ${mb(progress.total)} MB (${Math.round(progress.progress)}%). A foto fica neste dispositivo.`:'A obter os ficheiros do modelo local. A foto fica neste dispositivo.';}
   else if(progress.stage==='inference')status.textContent=`A identificar os alimentos neste dispositivo${progress.part?' — grupo '+progress.part+' de '+progress.total:''}. Podes cancelar; o stock mantém-se até confirmares.`;
