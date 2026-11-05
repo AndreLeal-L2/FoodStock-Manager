@@ -9,7 +9,7 @@ const box=(xmin=0,ymin=0,xmax=100,ymax=100)=>({xmin,ymin,xmax,ymax});
 const prediction=(label,score=.8,b=box())=>({label,score,box:b});
 const image=()=>({width:100,height:100,data:new Uint8ClampedArray(100*100*4)});
 test('automatic vocabulary covers pantry foods without a user reference catalogue',()=>{
- assert.equal(foodForLabel('bag of rice').name,'Arroz');assert.equal(foodForLabel('canned beans').name,'Feijão');assert.equal(foodForLabel('tomato sauce').name,'Polpa de tomate');assert.equal(foodForLabel('orange juice').name,'Sumo');assert.equal(foodForLabel('potato chips').name,'Batatas fritas');assert.equal(foodForLabel('BISCOTTI').name,'Bolachas');assert.equal(foodForLabel('spaceship'),null);assert.equal(foodForLabel('rice milk'),null);assert.ok(VISUAL_FOODS.some(food=>food.label==='rice'));
+ assert.equal(foodForLabel('bag of rice').name,'Arroz');assert.equal(foodForLabel('canned beans').name,'Feijão');assert.equal(foodForLabel('tomato sauce').name,'Polpa de tomate');assert.equal(foodForLabel('orange juice').name,'Sumo');assert.equal(foodForLabel('potato chips').name,'Batatas fritas');assert.equal(foodForLabel('spaceship'),null);assert.equal(foodForLabel('rice milk'),null);assert.ok(VISUAL_FOODS.some(food=>food.label==='rice'));
 });
 test('model results reject unknown/weak/invalid predictions, clip boxes and deduplicate overlapping products',()=>{
  const result=processPredictions([prediction('rice',.9,box(-20,-10,80,90)),prediction('rice',.8,box(0,0,75,85)),prediction('beans',.8,box(110,10,180,90)),prediction('spaceship'),prediction('milk',.1),prediction('water bottle',NaN),prediction('eggs',.8,{...box(),xmax:Infinity})],200,100);
@@ -20,9 +20,9 @@ test('separate boxes count visible packages, while physical inventory remains a 
  const draft=photoDraft(items,[{id:'rice',name:'Arroz',unit:'kg',stock:4.25}]);assert.equal(draft.items[0].quantity,'');assert.equal(draft.items[0].expectedStock,4.25);draft.items[0].quantity='2';assert.equal(captureData(draft).items[0].quantity,2);
  assert.equal(processPredictions([],200,100).items.length,0);
 });
-function fakeLibrary({failRun=false,invalidClass=false,nonFood=false}={}){
+function fakeLibrary({failRun=false,invalidClass=false,nonFood=false,score=.8}={}){
  const calls={downloads:[],images:[],inputs:[],disposed:0};
- const imageProcessor=Object.assign(async raw=>{calls.images.push(raw);return {pixel_values:raw.data};},{post_process_object_detection:()=>[{boxes:[[0,0,80,90]],classes:[invalidClass?9999:nonFood?VISUAL_QUERIES.findIndex(query=>query.label===null):VISUAL_QUERIES.findIndex(query=>query.text==='a photo of bag of rice')],scores:[.8]}]});
+ const imageProcessor=Object.assign(async raw=>{calls.images.push(raw);return {pixel_values:raw.data};},{post_process_object_detection:()=>[{boxes:[[0,0,80,90]],classes:[invalidClass?9999:nonFood?VISUAL_QUERIES.findIndex(query=>query.label===null):VISUAL_QUERIES.findIndex(query=>query.text==='a photo of bag of rice')],scores:[score]}]});
  const library={env:{backends:{onnx:{wasm:{}}}},RawImage:class{constructor(data,width,height,channels){Object.assign(this,{data,width,height,channels});}},AutoProcessor:{from_pretrained:async(id,options)=>{if(options.local_files_only&&!library.env.allowLocalModels)throw Error('Invalid upstream local-only configuration');calls.downloads.push({id,options});return {image_processor:imageProcessor};}},AutoTokenizer:{from_pretrained:async(id,options)=>{calls.downloads.push({id,options});return prompts=>{assert.deepEqual(prompts,VISUAL_QUERIES.map(query=>query.text));return {input_ids:'all-foods'};};}},AutoModelForZeroShotObjectDetection:{from_pretrained:async(id,options)=>{calls.downloads.push({id,options});return Object.assign(async inputs=>{calls.inputs.push(inputs);assert.ok(inputs.pixel_values instanceof Uint8ClampedArray);assert.equal(inputs.input_ids,'all-foods');if(failRun)throw Error('inference failed');return {};},{dispose:async()=>calls.disposed++});}}};return {library,calls};
 }
 test('model adapter keeps pixels local and uses one inference per photo with all food queries',async()=>{
@@ -71,4 +71,12 @@ test('visual descriptions map to canonical foods and keep indistinguishable powd
 test('valid non-food alternatives never become stock candidates',async()=>{
  const nonFood=fakeLibrary({nonFood:true}),recognizer=new LocalFoodRecognizer({libraryLoader:async()=>nonFood.library}),result=await recognizer.recognize(image());
  assert.deepEqual(result.items,[]);assert.deepEqual(result.detections,[]);assert.equal(result.model.predictionCount,0);
+});
+
+test('a weak visual scene abstains while a stronger scene can still include weaker individual foods',async()=>{
+ const weak=fakeLibrary({score:.45}),uncertain=await new LocalFoodRecognizer({libraryLoader:async()=>weak.library}).recognize(image());
+ assert.equal(uncertain.uncertain,true);assert.deepEqual(uncertain.items,[]);assert.deepEqual(uncertain.detections,[]);
+ const strong=fakeLibrary(),load=strong.library.AutoProcessor.from_pretrained;
+ strong.library.AutoProcessor.from_pretrained=async(...args)=>{const processor=await load(...args);processor.image_processor.post_process_object_detection=()=>[{boxes:[[0,0,45,90],[55,0,100,90]],classes:['rice','beans'].map(label=>VISUAL_QUERIES.findIndex(query=>query.label===label)),scores:[.8,.4]}];return processor;};
+ const result=await new LocalFoodRecognizer({libraryLoader:async()=>strong.library}).recognize(image());assert.equal(result.uncertain,false);assert.deepEqual(result.items.map(item=>item.name),['Arroz','Feijão']);assert.ok(result.items.every(item=>item.quantity===null));
 });

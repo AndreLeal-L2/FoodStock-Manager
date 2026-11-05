@@ -50,7 +50,8 @@ export class LocalFoodRecognizer {
    return {label:VISUAL_QUERIES[result.classes[index]].label,score:result.scores[index],box:{xmin:box[0],ymin:box[1],xmax:box[2],ymax:box[3]}};
   }).filter(Boolean);
   predictions.sort((a,b)=>b.score-a.score);
-  return {...processPredictions(predictions.slice(0,900),image.width,image.height,{threshold:MODEL.boxThreshold}),model:{id:MODEL.id,device:this.device,predictionCount:predictions.length,topPredictions:predictions.slice(0,8).map(({label,score})=>({label,score}))}};
+  const uncertain=predictions.length>0&&predictions[0].score<MODEL.sceneThreshold;
+  return {uncertain,...processPredictions(uncertain?[]:predictions.slice(0,900),image.width,image.height,{threshold:MODEL.boxThreshold}),model:{id:MODEL.id,device:this.device,predictionCount:predictions.length,topPredictions:predictions.slice(0,8).map(({label,score})=>({label,score}))}};
  }
  async dispose(){await this.model?.dispose?.();this.model=null;this.processor=null;this.tokenizer=null;}
 }
