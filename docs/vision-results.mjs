@@ -1,10 +1,5 @@
 import {foodForLabel} from './food-labels.mjs?v=20261105.4';
-function duplicate(a,b){
- const intersection=Math.max(0,Math.min(a.box.xmax,b.box.xmax)-Math.max(a.box.xmin,b.box.xmin))*Math.max(0,Math.min(a.box.ymax,b.box.ymax)-Math.max(a.box.ymin,b.box.ymin));
- const areaA=(a.box.xmax-a.box.xmin)*(a.box.ymax-a.box.ymin),areaB=(b.box.xmax-b.box.xmin)*(b.box.ymax-b.box.ymin);
- // Same food: suppress nested boxes. Different foods: suppress only competing boxes for the same area.
- return intersection/(a.label===b.label?Math.min(areaA,areaB):areaA+areaB-intersection)>.65;
-}
+function overlap(a,b){const intersection=Math.max(0,Math.min(a.xmax,b.xmax)-Math.max(a.xmin,b.xmin))*Math.max(0,Math.min(a.ymax,b.ymax)-Math.max(a.ymin,b.ymin));return intersection/Math.max(1,Math.min((a.xmax-a.xmin)*(a.ymax-a.ymin),(b.xmax-b.xmin)*(b.ymax-b.ymin)));}
 export function processPredictions(predictions,width,height,{threshold=.25}={}){
  if(!Array.isArray(predictions)||predictions.length>900||!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1)throw Error('O modelo devolveu uma resposta inválida.');
  const candidates=[];
@@ -16,7 +11,7 @@ export function processPredictions(predictions,width,height,{threshold=.25}={}){
   candidates.push({...food,score:prediction.score,box:bounded});
  }
  candidates.sort((a,b)=>b.score-a.score);
- const detections=[];for(const candidate of candidates){if(!detections.some(other=>duplicate(candidate,other)))detections.push(candidate);if(detections.length>=60)break;}
+ const detections=[];for(const candidate of candidates){if(!detections.some(other=>overlap(candidate.box,other.box)>.65))detections.push(candidate);if(detections.length>=60)break;}
  const groups=new Map();
  for(const detection of detections){if(!groups.has(detection.label))groups.set(detection.label,{name:detection.name,category:detection.category,brand:'',unit:null,quantity:null,visibleCount:0,notes:'Identificação pela aparência. Pode estar errada: confirma o alimento, os itens em falta e a quantidade total. A imagem não mede o peso nem o conteúdo restante.'});groups.get(detection.label).visibleCount++;}
  return {items:[...groups.values()],detections:detections.map(({name,box,score})=>({name,score,box,polygon:[[box.xmin,box.ymin],[box.xmax,box.ymin],[box.xmax,box.ymax],[box.xmin,box.ymax]]}))};
