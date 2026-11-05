@@ -41,7 +41,7 @@ const visualDescriptions={
  'carrots':['carrot'],'mushrooms':['mushroom'],'onions':['onion'],
  'tomatoes':['tomato'],'cabbage':['red cabbage','purple cabbage'],
  'bananas':['banana','peeled banana'],'apples':['apple'],'oranges':['orange','orange slice'],
- 'lemons':['lemon','lemon slice'],'pears':['pear'],'kiwi':['kiwi fruit','kiwi slice'],'lime':['lime fruit'],
+ 'lemons':['lemon','lemon slice'],'pears':['pear'],'kiwi':['kiwi fruit','kiwi slice'],
  'milk':['milk carton'],'yogurt':['yogurt carton','yogurt cup'],
  'beans':['canned beans','bag of beans'],'tomato sauce':['tomato paste','carton of tomato sauce'],
  'olive oil':['bottle of olive oil'],'juice':['juice carton'],'coffee':['bag of coffee'],
