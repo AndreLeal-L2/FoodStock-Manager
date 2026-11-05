@@ -20,9 +20,9 @@ test('separate boxes count visible packages, while physical inventory remains a 
  const draft=photoDraft(items,[{id:'rice',name:'Arroz',unit:'kg',stock:4.25}]);assert.equal(draft.items[0].quantity,'');assert.equal(draft.items[0].expectedStock,4.25);draft.items[0].quantity='2';assert.equal(captureData(draft).items[0].quantity,2);
  assert.equal(processPredictions([],200,100).items.length,0);
 });
-function fakeLibrary({failRun=false}={}){
+function fakeLibrary({failRun=false,invalidClass=false}={}){
  const calls={downloads:[],images:[],inputs:[],disposed:0};
- const imageProcessor=Object.assign(async raw=>{calls.images.push(raw);return {pixel_values:raw.data};},{post_process_object_detection:()=>[{boxes:[[0,0,80,90]],classes:[VISUAL_FOODS.findIndex(food=>food.label==='rice')],scores:[.8]}]});
+ const imageProcessor=Object.assign(async raw=>{calls.images.push(raw);return {pixel_values:raw.data};},{post_process_object_detection:()=>[{boxes:[[0,0,80,90]],classes:[invalidClass?9999:VISUAL_FOODS.findIndex(food=>food.label==='rice')],scores:[.8]}]});
  const library={env:{backends:{onnx:{wasm:{}}}},RawImage:class{constructor(data,width,height,channels){Object.assign(this,{data,width,height,channels});}},AutoProcessor:{from_pretrained:async(id,options)=>{if(options.local_files_only&&!library.env.allowLocalModels)throw Error('Invalid upstream local-only configuration');calls.downloads.push({id,options});return {image_processor:imageProcessor};}},AutoTokenizer:{from_pretrained:async(id,options)=>{calls.downloads.push({id,options});return prompts=>{assert.deepEqual(prompts,VISUAL_FOODS.map(food=>'a photo of '+food.label));return {input_ids:'all-foods'};};}},AutoModelForZeroShotObjectDetection:{from_pretrained:async(id,options)=>{calls.downloads.push({id,options});return Object.assign(async inputs=>{calls.inputs.push(inputs);assert.ok(inputs.pixel_values instanceof Uint8ClampedArray);assert.equal(inputs.input_ids,'all-foods');if(failRun)throw Error('inference failed');return {};},{dispose:async()=>calls.disposed++});}}};return {library,calls};
 }
 test('model adapter keeps pixels local and uses one inference per photo with all food queries',async()=>{
@@ -39,8 +39,9 @@ test('the visual model runs on the verified CPU backend and propagates inference
  const {library,calls}=fakeLibrary(),recognizer=new LocalFoodRecognizer({revisionResolver:async()=>'a'.repeat(40),libraryLoader:async()=>library});assert.equal((await recognizer.recognize(image())).model.device,'wasm');assert.ok(calls.downloads.filter(call=>call.options.device).every(call=>call.options.device==='wasm'));
  const failed=fakeLibrary({failRun:true}),broken=new LocalFoodRecognizer({revisionResolver:async()=>'a'.repeat(40),libraryLoader:async()=>failed.library});await assert.rejects(broken.recognize(image()),/inference failed/);
 });
-test('load failures cannot fabricate detections or require personal reference data',async()=>{
+test('load failures and invalid classes cannot fabricate detections or require personal reference data',async()=>{
  const recognizer=new LocalFoodRecognizer({revisionResolver:async()=>'a'.repeat(40),libraryLoader:async()=>{throw Error('offline download');}});await assert.rejects(recognizer.recognize(image()),/offline download/);
+ const invalid=fakeLibrary({invalidClass:true}),broken=new LocalFoodRecognizer({libraryLoader:async()=>invalid.library});await assert.rejects(broken.recognize(image()),/Identificação do modelo inválida/);
 });
 class FakeWorker {constructor(){this.messages=[];this.terminated=false;}postMessage(message){this.messages.push(message);}terminate(){this.terminated=true;}reply(result,id=this.messages.at(-1).id){this.onmessage({data:{id,result}});}}
 test('client reuses a worker, rejects concurrent jobs and ignores stale replies',async()=>{
