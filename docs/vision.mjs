@@ -29,7 +29,7 @@ export class Vision {
   if(!this.draft&&view.profile.photoDraft){this.draft=structuredClone(view.profile.photoDraft);this.render();}
   document.querySelector('#photo-requirements').textContent='Escolhe a foto e identifica os alimentos com IA local, sem cadastrar referências. Confirma sempre os resultados antes de guardar.';
  }
- reset(){this.generation=(this.generation||0)+1;clearTimeout(this.timer);this.abort?.abort();this.draft=null;this.image=null;this.busy=false;this.panel.innerHTML='';this.panel.hidden=true;this.preview.getContext('2d').clearRect(0,0,this.preview.width,this.preview.height);this.preview.hidden=true;document.querySelector('#photo-cancel').hidden=true;document.querySelector('#photo-clear-model').disabled=false;document.querySelector('#photo-analyze').disabled=true;document.querySelector('#photo-status').textContent='';}
+ reset(){for(const control of document.querySelectorAll('[data-photo-input],#photo-manual'))control.disabled=false;this.generation=(this.generation||0)+1;clearTimeout(this.timer);this.abort?.abort();this.draft=null;this.image=null;this.busy=false;this.panel.innerHTML='';this.panel.hidden=true;this.preview.getContext('2d').clearRect(0,0,this.preview.width,this.preview.height);this.preview.hidden=true;document.querySelector('#photo-cancel').hidden=true;document.querySelector('#photo-clear-model').disabled=false;document.querySelector('#photo-analyze').disabled=true;document.querySelector('#photo-status').textContent='';}
  async choose(file){
   if(!file||this.busy)return;const store=this.getStore(),generation=(this.generation||0)+1;this.generation=generation;this.image=null;this.preview.hidden=true;const button=document.querySelector('#photo-analyze');button.disabled=true;
   const image=await readImage(file,1280);if(store!==this.getStore()||generation!==this.generation)return;this.image=image;this.preview.width=image.width;this.preview.height=image.height;this.preview.getContext('2d').drawImage(image,0,0);this.preview.hidden=false;button.disabled=false;document.querySelector('#photo-status').textContent='Fotografia preparada. Os píxeis são analisados apenas neste dispositivo.';
@@ -39,7 +39,7 @@ export class Vision {
   if(this.busy||!this.image)return;
   if(this.scope!==this.getStore().key)throw Error('A conta mudou. Escolhe novamente a fotografia.');
   if(this.draft&&!confirm('Substituir o rascunho de reconhecimento atual? O stock ainda não foi alterado.'))return;
-  this.busy=true;this.abort=new AbortController();const button=document.querySelector('#photo-analyze'),cancel=document.querySelector('#photo-cancel'),store=this.getStore();button.disabled=true;cancel.hidden=false;document.querySelector('#photo-clear-model').disabled=true;
+  this.busy=true;for(const control of document.querySelectorAll('[data-photo-input],#photo-manual'))control.disabled=true;this.abort=new AbortController();const button=document.querySelector('#photo-analyze'),cancel=document.querySelector('#photo-cancel'),store=this.getStore();button.disabled=true;cancel.hidden=false;document.querySelector('#photo-clear-model').disabled=true;
   document.querySelector('#photo-status').textContent='A preparar o reconhecimento local…';
   try{
    const result=await this.model.recognize(this.image.getContext('2d').getImageData(0,0,this.image.width,this.image.height),{signal:this.abort.signal,onProgress:progress=>{if(store===this.getStore())this.progress(progress);}});if(store!==this.getStore())return;
@@ -47,7 +47,7 @@ export class Vision {
    document.querySelector('#photo-status').textContent=draft.items.length?`${draft.items.length} alimento(s) sugerido(s) por IA local. Revê a identificação e as quantidades totais; podem faltar produtos.`:'O modelo não identificou alimentos com segurança. Tenta uma foto mais próxima ou adiciona os itens manualmente.';
    this.panel.scrollIntoView({block:'start',behavior:'instant'});
   }catch(error){if(store!==this.getStore())return;document.querySelector('#photo-status').textContent=error.name==='AbortError'?'Análise cancelada. O stock não foi alterado.':'A análise não foi concluída. O stock não foi alterado.';if(error.name!=='AbortError')throw error;}
-  finally{if(store===this.getStore()){this.busy=false;button.disabled=!this.image;cancel.hidden=true;document.querySelector('#photo-clear-model').disabled=false;}}
+  finally{if(store===this.getStore()){this.busy=false;for(const control of document.querySelectorAll('[data-photo-input],#photo-manual'))control.disabled=false;button.disabled=!this.image;cancel.hidden=true;document.querySelector('#photo-clear-model').disabled=false;}}
  }
  drawDetections(detections){
   const ctx=this.preview.getContext('2d'),scale=this.image.width/Math.max(1,this.preview.getBoundingClientRect().width),size=Math.max(14,12*scale);ctx.drawImage(this.image,0,0);ctx.lineWidth=2*scale;ctx.font=`${size}px sans-serif`;
