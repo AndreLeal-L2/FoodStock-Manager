@@ -6,7 +6,7 @@ export function photoDraft(items,products){
   if(typeof item.name!=='string'||!item.name.trim()||item.name.length>120||!categories.includes(item.category))throw Error('Alimento reconhecido inválido.');
   const matches=products.filter(p=>p.name.trim().toLocaleLowerCase('pt-PT')===item.name.trim().toLocaleLowerCase('pt-PT'));
   const p=products.find(p=>p.id===item.productId)||(matches.length===1?matches[0]:null);
-  return {rowId:crypto.randomUUID(),newProductId:crypto.randomUUID(),productId:p?.id||'',name:p?.name||item.name,category:item.category,brand:typeof item.brand==='string'?item.brand.slice(0,120):'',
+  return {sourceName:item.name,rowId:crypto.randomUUID(),newProductId:crypto.randomUUID(),productId:p?.id||'',name:p?.name||item.name,category:item.category,brand:typeof item.brand==='string'?item.brand.slice(0,120):'',
    quantity:!p&&typeof item.quantity==='number'&&item.quantity>0&&item.quantity<1e9&&['kg','L','un'].includes(item.unit)?String(Math.round(item.quantity*1000)/1000):'',
    unit:p?.unit||(['kg','L','un'].includes(item.unit)?item.unit:''),expectedStock:p?.stock??null,
    visibleCount:Number.isInteger(item.visibleCount)&&item.visibleCount>0?item.visibleCount:null,notes:typeof item.notes==='string'?item.notes.slice(0,500):''};
@@ -14,7 +14,7 @@ export function photoDraft(items,products){
 }
 export function captureData(draft){return {items:draft.items.map(i=>({productId:i.productId||i.newProductId,quantity:Number(i.quantity),expectedStock:i.expectedStock,category:i.category,brand:i.brand.trim(),newProduct:i.productId?null:{name:i.name.trim(),unit:i.unit,category:i.category,brand:i.brand.trim()}}))};}
 export function appendPhotoDraft(draft,items,products){
- const extra=photoDraft(items,products).items.filter(line=>!draft.items.some(current=>(line.productId&&current.productId===line.productId)||normalizeLabel(current.name)===normalizeLabel(line.name)));
+ const extra=photoDraft(items,products).items.filter(line=>!draft.items.some(current=>(line.productId&&current.productId===line.productId)||normalizeLabel(current.name)===normalizeLabel(line.name)||normalizeLabel(current.sourceName||current.name)===normalizeLabel(line.sourceName||line.name)));
  if(draft.items.length+extra.length>60)throw Error('A revisão excederia 60 alimentos. Guarda ou reduz a revisão atual antes de acrescentar outros.');
  return {...draft,items:[...draft.items,...extra]};
 }

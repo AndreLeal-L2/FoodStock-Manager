@@ -27,6 +27,7 @@ test('explicit visual search skips OCR, and engine failures cannot fabricate sug
 test('adding visual suggestions keeps manual edits, draft identity and stock expectations without duplicates',()=>{
  const products=[{id:'rice',name:'Arroz',unit:'kg',stock:4}],draft=photoDraft([recognized('Arroz')],products);draft.items[0].quantity='2.5';draft.items[0].brand='Minha marca';
  const before=structuredClone(draft),combined=appendPhotoDraft(draft,[recognized('ARROZ'),recognized('Feijão')],products);assert.equal(combined.id,draft.id);assert.equal(combined.items.length,2);assert.deepEqual(combined.items[0],before.items[0]);assert.equal(combined.items[0].expectedStock,4);assert.deepEqual(draft,before);
+ const renamed=photoDraft([recognized('Feijão')],[]);renamed.items[0].name='Feijão preto';renamed.items[0].quantity='3';const extra=appendPhotoDraft(renamed,[recognized('Feijão'),recognized('Bananas')],[]);assert.deepEqual(extra.items.map(i=>i.name),['Feijão preto','Bananas']);assert.equal(extra.items[0].quantity,'3');
  const full={...draft,items:Array.from({length:60},(_,i)=>({...draft.items[0],name:'Item '+i}))};assert.throws(()=>appendPhotoDraft(full,[recognized('Bananas')],products),/60 alimentos/);assert.equal(full.items.length,60);
 });
 

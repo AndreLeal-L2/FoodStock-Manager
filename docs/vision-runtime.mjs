@@ -27,8 +27,6 @@ export class LocalFoodRecognizer {
    // Transformers.js requires this flag even for its browser-cache-only mode.
    this.library.env.allowLocalModels=this.options.local_files_only;
    this.processor=await this.library.AutoProcessor.from_pretrained(MODEL.id,this.options);
-   // A smaller image budget limits activation memory on phones. No picture leaves this worker.
-   this.processor.image_processor.size={shortest_edge:480,longest_edge:640};
    let adapter;try{adapter=await this.gpu?.requestAdapter();}catch{}
    this.device=adapter?'webgpu':'wasm';
    try{this.model=await this.library.AutoModelForZeroShotObjectDetection.from_pretrained(MODEL.id,{...this.options,device:this.device});}
