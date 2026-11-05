@@ -44,7 +44,7 @@
     <section id="stock" class="view" hidden>
       <article class="inventory-panel"><div class="section-heading"><h2>Na despensa</h2><label class="search">Procurar<input id="search" type="search" placeholder="Nome do alimento"></label></div><div id="inventory"></div></article>
       <article class="photo-panel form-panel"><h2>Identificar alimentos por fotografia</h2><p id="photo-requirements" class="muted"></p>
-        <p class="hint">Fotografa os alimentos separados, com rótulos visíveis e boa luz. A identificação pode falhar: vais rever os nomes, as categorias e as quantidades antes de guardar. A marca é opcional.</p>
+        <p class="hint">Versão experimental. Fotografa os alimentos separados, com rótulos visíveis e boa luz. O modelo pode omitir produtos ou sugerir produtos que não estão na foto: vais rever os nomes, as categorias e as quantidades antes de guardar. A marca é opcional.</p>
         <div class="photo-inputs"><label>Escolher imagem<input data-photo-input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif"></label><label>Tirar fotografia<input data-photo-input type="file" accept="image/*" capture="environment"></label></div>
         <canvas id="photo-preview" class="photo-preview" role="img" aria-label="Fotografia e alimentos sugeridos pelo modelo" hidden></canvas><p id="photo-status" role="status"></p>
         <div class="checkout-actions"><button id="photo-analyze" type="button" disabled>Identificar produtos</button><button id="photo-cancel" type="button" class="secondary" hidden>Cancelar análise</button><button id="photo-manual" type="button" class="secondary">Adicionar manualmente</button></div>

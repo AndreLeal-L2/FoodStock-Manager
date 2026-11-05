@@ -81,7 +81,7 @@ FOODSTOCK_BROWSER=/usr/bin/chromium npm run test:vision:real
 
 `ONNXRUNTIME_NODE_INSTALL=skip` é a opção suportada pelo pacote para não descarregar componentes nativos/CUDA desnecessários. A aplicação usa o runtime do navegador; não desativa a verificação de integridade npm nem TLS. `docs/vendor/` é gerado e ignorado pelo Git. O workflow Pages executa o build antes de publicar.
 
-As validações distinguem domínio/privacidade/cancelamento, UI com fronteira do modelo simulada, runtime Web/WASM real com um grafo ONNX pequeno e integração com pesos reais numa fotografia pública de fruta, sem referências. O teste real também verifica reabertura offline e que só pedidos públicos de ficheiros/metadados saem do navegador. As fotos de teste não são pessoais nem dados de treino, e não demonstram precisão para todas as despensas.
+As validações distinguem domínio/privacidade/cancelamento, UI com fronteira do modelo simulada, runtime Web/WASM real com um grafo ONNX pequeno e integração com pesos reais numa fotografia pública de fruta, sem referências. O teste real também verifica reabertura offline e que só pedidos públicos de ficheiros/metadados saem do navegador. As fotos de teste não são pessoais nem dados de treino, e não demonstram precisão para todas as despensas. Na validação atual, o modelo identificou banana e também sugeriu sal incorretamente na mesma fotografia. É uma versão experimental; ainda não foi medida a precisão com embalagens de arroz/feijão nem em dispositivos móveis físicos. A revisão humana é obrigatória.
 
 ## Compras, estatísticas e modo offline
 
